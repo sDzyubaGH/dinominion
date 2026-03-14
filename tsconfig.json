@@ -8,7 +8,9 @@
 		"strict": true,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"types": ["node"]
 	},
-	"include": ["bot/**/*.ts", "cards/**/*.ts"]
+	"include": ["src/**/*.ts", "cards/starterCards.ts"]
 }

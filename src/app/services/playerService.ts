@@ -1,0 +1,34 @@
+import type { Player } from '@prisma/client';
+import { DeckService } from './deckService.js';
+import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
+
+export class PlayerService {
+	constructor(
+		private readonly playerRepository: PlayerRepository,
+		private readonly deckService: DeckService
+	) {}
+
+	async registerOrGet(telegramId: string, username?: string): Promise<Player> {
+		const existing = await this.playerRepository.findByTelegramId(telegramId);
+		if (existing) {
+			const updatedPlayer =
+				existing.username !== (username ?? null)
+					? await this.playerRepository.updateUsername(existing.id, username)
+					: existing;
+
+			await this.deckService.ensureStarterDeck(updatedPlayer.id);
+			return updatedPlayer;
+		}
+
+		const player = await this.playerRepository.create({
+			telegramId,
+			username
+		});
+		await this.deckService.ensureStarterDeck(player.id);
+		return player;
+	}
+
+	async getProfile(telegramId: string): Promise<Player | null> {
+		return this.playerRepository.findByTelegramId(telegramId);
+	}
+}

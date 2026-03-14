@@ -1,0 +1,54 @@
+generator client {
+	provider = "prisma-client-js"
+}
+
+datasource db {
+	provider = "postgresql"
+	url      = env("DATABASE_URL")
+}
+
+enum BattleStatus {
+	ACTIVE
+	FINISHED
+}
+
+model Player {
+	id              String   @id @default(cuid())
+	telegramId      String   @unique
+	username        String?
+	createdAt       DateTime @default(now())
+	updatedAt       DateTime @updatedAt
+	deck            Deck?
+	battlesAsPlayer1 Battle[] @relation("BattlePlayer1")
+	battlesAsPlayer2 Battle[] @relation("BattlePlayer2")
+	wonBattles      Battle[] @relation("BattleWinner")
+}
+
+model Deck {
+	id        String   @id @default(cuid())
+	playerId  String   @unique
+	name      String
+	cardsJson Json
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+	player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+}
+
+model Battle {
+	id                  String       @id
+	player1Id           String
+	player2Id           String
+	status              BattleStatus @default(ACTIVE)
+	winnerId            String?
+	currentTurnPlayerId String
+	battleStateJson     Json
+	createdAt           DateTime     @default(now())
+	updatedAt           DateTime     @updatedAt
+	finishedAt          DateTime?
+	player1             Player       @relation("BattlePlayer1", fields: [player1Id], references: [id])
+	player2             Player       @relation("BattlePlayer2", fields: [player2Id], references: [id])
+	winner              Player?      @relation("BattleWinner", fields: [winnerId], references: [id])
+
+	@@index([player1Id, status])
+	@@index([player2Id, status])
+}

@@ -1,65 +1,121 @@
-# Прототип Dinominion
+# Dino Clash Bot MVP
 
-Прототип пошаговой коллекционной карточной игры про динозавров, который полностью работает через Telegram-бота с командами, сообщениями и inline-кнопками.
+Minimal dinosaur-themed turn-based collectible card game MVP for Telegram Bot.
 
-## Стек
+## Stack
 
 - Node.js
 - TypeScript
-- `grammy`
-- Хранение матчей в памяти
+- grammY
+- PostgreSQL
+- Redis
+- Prisma
 
-## Запуск
+## MVP Features
 
-1. Создайте Telegram-бота через BotFather и получите токен.
-2. Экспортируйте `BOT_TOKEN` в вашей shell-сессии.
-3. Установите зависимости командой `npm install`.
-4. Запустите бота командой `npm run dev`.
+- Player registration via `/start`
+- Automatic starter deck creation
+- Matchmaking queue via Redis
+- Persistent players, decks, and battles via PostgreSQL + Prisma
+- Active battle state and locks in Redis
+- Async 1v1 battles in private Telegram chats
+- Turn system, draw, play card, attack, end turn, win/lose
+- Simple dinosaur mechanics: Pack, Egg, Guard
 
-## Команды
+## Commands
 
-- `/start` регистрирует игрока и выдает стартовую колоду.
-- `/deck` показывает стартовую колоду из 30 карт.
-- `/play` открывает лобби матча в групповом чате.
-- `/hand` показывает карты в руке.
-- `/board` показывает текущее состояние поля боя.
+- `/start` register player and create starter deck
+- `/profile` show player info
+- `/deck` show starter deck
+- `/play` join matchmaking queue
+- `/battle` show current active battle
 
-## Правила прототипа
+## Environment
 
-- 2 игрока, по 30 здоровья у каждого.
-- У каждого игрока колода из 30 карт.
-- Энергия увеличивается на 1 каждый ход, максимум до 10.
-- Лимит поля: 5 динозавров на игрока.
-- Типы карт: динозавр, мутация, катастрофа.
-- Яйца вылупляются через 2 хода владельца.
-- Динозавры стаи получают бонус, если рядом есть существа того же вида.
-- Некоторые динозавры могут эволюционировать за энергию.
+Copy `.env.example` and fill values:
 
-## Пример сообщения с полем боя
-
-```text
-Dinominion
-Ход 4
-
-Противник: Vera | Здоровье 23 | Энергия 3/3
-Поле: 1.Трик Шеллгард 2/4 Провокация | 2.Яйцо Солнцеспоры 0/3 Яйцо(1)
-
-Активная сторона: Milo | Здоровье 27 | Энергия 4/4
-Поле: 1.Раптор Углегребня 4/2 | 2.Мохоспин Травоед 1/4
-
-Рука: 4 карт
-Рука противника: 3 карт
-
-Активный игрок: Milo
-Выберите действие ниже.
-
-Последние события:
-- Milo разыгрывает Раптора Углегребня.
-- У Vera Яйцо Солнцеспоры вылупляется в Детеныша Рассветной Чешуи.
+```env
+BOT_TOKEN=...
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/dino_clash
+REDIS_URL=redis://localhost:6379
 ```
 
-## Примечания
+## Setup
 
-- Прототип использует только хранение в памяти. После перезапуска процесса игроки и матчи сбрасываются.
-- Inline-кнопки привязаны к Telegram user ID активного игрока, чтобы посторонние не могли нажимать действия.
-- После каждого действия бот обновляет одно и то же сообщение с полем боя, чтобы состояние матча оставалось в одном месте.
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Generate Prisma client:
+
+```bash
+npm run prisma:generate
+```
+
+3. Run migration:
+
+```bash
+npm run prisma:migrate -- --name init
+```
+
+4. Start PostgreSQL and Redis.
+
+5. Start the bot:
+
+```bash
+npm run dev
+```
+
+## Scripts
+
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
+- `npm run format`
+- `npm run prisma:generate`
+- `npm run prisma:migrate`
+
+## Battle Flow
+
+1. Two users run `/start`
+2. Both run `/play`
+3. Redis queue matches them
+4. Bot sends battle messages to both players
+5. Current player uses inline buttons:
+    - `View hand`
+    - `Play card`
+    - `Attack`
+    - `End turn`
+    - `Refresh battle`
+
+## Example Battle Message
+
+```text
+🦖 Dino Clash
+
+Turn: @player1
+Energy: 3/3
+
+@player1
+❤️ 20 HP
+Board:
+1. Forest Raptor 3/2
+2. Ancient Egg (hatches in 1)
+Hand: 3 cards
+
+@player2
+❤️ 18 HP
+Board:
+1. Horned Guardian 1/4 [Guard]
+Hand: 4 cards
+```
+
+## Notes
+
+- The domain engine in `src/domain` is pure and does not depend on Telegram, Prisma, or Redis.
+- Redis stores queue, active battle cache, battle view references, and battle locks.
+- PostgreSQL stores durable metadata and battle history.
+- Long polling is used for simplicity.
