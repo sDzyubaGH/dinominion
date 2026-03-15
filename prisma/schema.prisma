@@ -13,20 +13,20 @@ enum BattleStatus {
 }
 
 model Player {
-	id              String   @id @default(cuid())
-	telegramId      String   @unique
-	username        String?
-	createdAt       DateTime @default(now())
-	updatedAt       DateTime @updatedAt
-	deck            Deck?
+	id               Int      @id @default(autoincrement())
+	telegramId       BigInt   @unique
+	username         String?
+	createdAt        DateTime @default(now())
+	updatedAt        DateTime @updatedAt
+	deck             Deck?
 	battlesAsPlayer1 Battle[] @relation("BattlePlayer1")
 	battlesAsPlayer2 Battle[] @relation("BattlePlayer2")
-	wonBattles      Battle[] @relation("BattleWinner")
+	wonBattles       Battle[] @relation("BattleWinner")
 }
 
 model Deck {
-	id        String   @id @default(cuid())
-	playerId  String   @unique
+	id        Int      @id @default(autoincrement())
+	playerId  Int      @unique
 	name      String
 	cardsJson Json
 	createdAt DateTime @default(now())
@@ -35,12 +35,12 @@ model Deck {
 }
 
 model Battle {
-	id                  String       @id
-	player1Id           String
-	player2Id           String
+	id                  Int          @id @default(autoincrement())
+	player1Id           Int
+	player2Id           Int
 	status              BattleStatus @default(ACTIVE)
-	winnerId            String?
-	currentTurnPlayerId String
+	winnerId            Int?
+	currentTurnPlayerId Int
 	battleStateJson     Json
 	createdAt           DateTime     @default(now())
 	updatedAt           DateTime     @updatedAt

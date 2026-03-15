@@ -15,16 +15,15 @@ export type BattleViewMode =
 	  }
 	| {
 			type: 'targets';
-			attackerId: string;
+			attackerId: number;
 	  };
 
 export function createBattleKeyboard(
 	state: BattleState,
-	viewerId: string,
+	viewerId: number,
 	mode: BattleViewMode
 ): InlineKeyboard {
 	const keyboard = new InlineKeyboard();
-	const battleId = state.battleId;
 	const isCurrentPlayer = state.currentPlayerId === viewerId && state.status === 'active';
 
 	if (mode.type === 'hand') {
@@ -36,16 +35,11 @@ export function createBattleKeyboard(
 					continue;
 				}
 				keyboard
-					.text(
-						`${definition.name} (${definition.cost})`,
-						`battle:${battleId}:play:${card.instanceId}`
-					)
+					.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`)
 					.row();
 			}
 		}
-		return keyboard
-			.text('Назад', `battle:${battleId}:back`)
-			.text('Обновить бой', `battle:${battleId}:refresh`);
+		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
 	}
 
 	if (mode.type === 'attackers') {
@@ -58,33 +52,27 @@ export function createBattleKeyboard(
 				if (!unit) {
 					continue;
 				}
-				keyboard
-					.text(mustCard(unit.cardId).name, `battle:${battleId}:attacker:${attackerId}`)
-					.row();
+				keyboard.text(mustCard(unit.cardId).name, `b:aa:${attackerId}`).row();
 			}
 		}
-		return keyboard
-			.text('Назад', `battle:${battleId}:back`)
-			.text('Обновить бой', `battle:${battleId}:refresh`);
+		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
 	}
 
 	if (mode.type === 'targets') {
 		if (!isCurrentPlayer) {
-			return keyboard
-				.text('Назад', `battle:${battleId}:back`)
-				.text('Обновить бой', `battle:${battleId}:refresh`);
+			return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
 		}
 
 		const actions = getAvailableActions(state, viewerId, mustCard);
 		const targets = actions.targetsByAttacker[mode.attackerId] ?? [];
-		const opponentId = Object.keys(state.players).find((playerId) => playerId !== viewerId);
-		const opponentBoard = opponentId ? state.players[opponentId].board : [];
+		const opponentId = Object.keys(state.players).find(
+			(playerId) => Number(playerId) !== viewerId
+		);
+		const opponentBoard = opponentId ? state.players[Number(opponentId)].board : [];
 
 		for (const target of targets) {
 			if (target.type === 'hero') {
-				keyboard
-					.text('Герой противника', `battle:${battleId}:target:hero:${mode.attackerId}`)
-					.row();
+				keyboard.text('Герой противника', `b:th:${mode.attackerId}`).row();
 				continue;
 			}
 
@@ -93,24 +81,19 @@ export function createBattleKeyboard(
 				continue;
 			}
 			keyboard
-				.text(
-					mustCard(unit.cardId).name,
-					`battle:${battleId}:target:unit:${mode.attackerId}:${unit.instanceId}`
-				)
+				.text(mustCard(unit.cardId).name, `b:tu:${mode.attackerId}:${unit.instanceId}`)
 				.row();
 		}
 
-		return keyboard
-			.text('Назад', `battle:${battleId}:attack`)
-			.text('Обновить бой', `battle:${battleId}:refresh`);
+		return keyboard.text('Назад', 'b:a')/*.text('Обновить бой', 'b:r')*/;
 	}
 
-	keyboard.text('Посмотреть руку', `battle:${battleId}:hand`).row();
+	keyboard.text('Посмотреть руку', 'b:h').row();
 	if (isCurrentPlayer) {
-		keyboard.text('Атаковать', `battle:${battleId}:attack`).row();
-		keyboard.text('Завершить ход', `battle:${battleId}:end`).row();
+		keyboard.text('Атаковать', 'b:a').row();
+		keyboard.text('Завершить ход', 'b:e').row();
 	}
-	keyboard.text('Обновить бой', `battle:${battleId}:refresh`);
+	// keyboard.text('Обновить бой', 'b:r');
 
 	return keyboard;
 }

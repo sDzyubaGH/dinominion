@@ -8,7 +8,7 @@ export class PlayerService {
 		private readonly deckService: DeckService
 	) {}
 
-	async registerOrGet(telegramId: string, username?: string): Promise<Player> {
+	async registerOrGet(telegramId: bigint, username?: string): Promise<Player> {
 		const existing = await this.playerRepository.findByTelegramId(telegramId);
 		if (existing) {
 			const updatedPlayer =
@@ -28,7 +28,7 @@ export class PlayerService {
 		return player;
 	}
 
-	async getProfile(telegramId: string): Promise<Player | null> {
+	async getProfile(telegramId: bigint): Promise<Player | null> {
 		return this.playerRepository.findByTelegramId(telegramId);
 	}
 }

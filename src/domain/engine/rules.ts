@@ -5,7 +5,7 @@ export const STARTING_HEALTH = 20;
 export const MAX_ENERGY = 10;
 export const MAX_BOARD_SIZE = 3;
 
-export function getOpponent(state: BattleState, playerId: string): BattleParticipantState {
+export function getOpponent(state: BattleState, playerId: number): BattleParticipantState {
 	const opponent = Object.values(state.players).find((player) => player.id !== playerId);
 	if (!opponent) {
 		throw new Error('Battle must have exactly two players.');

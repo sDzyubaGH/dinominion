@@ -1,23 +1,23 @@
 export type GameAction =
 	| {
 			type: 'play_card';
-			playerId: string;
-			cardInstanceId: string;
+			playerId: number;
+			cardInstanceId: number;
 	  }
 	| {
 			type: 'attack';
-			playerId: string;
-			attackerId: string;
+			playerId: number;
+			attackerId: number;
 			target:
 				| {
 						type: 'hero';
 				  }
 				| {
 						type: 'unit';
-						unitId: string;
+						unitId: number;
 				  };
 	  }
 	| {
 			type: 'end_turn';
-			playerId: string;
+			playerId: number;
 	  };

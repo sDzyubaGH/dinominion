@@ -16,8 +16,8 @@ export function registerPlayHandler(
 			return;
 		}
 
-		const player = await playerService.registerOrGet(String(ctx.from.id), ctx.from.username);
-		const activeBattle = await battleService.getActiveBattleForTelegramId(String(ctx.from.id));
+		const player = await playerService.registerOrGet(BigInt(ctx.from.id), ctx.from.username);
+		const activeBattle = await battleService.getActiveBattleForTelegramId(BigInt(ctx.from.id));
 		if (activeBattle) {
 			await ctx.reply('У вас уже есть активный бой. Используйте /battle, чтобы открыть его.');
 			return;
@@ -49,7 +49,7 @@ export function registerPlayHandler(
 			await battleService.storeBattleMessageRef(
 				snapshot.battle.id,
 				targetPlayer.id,
-				String(targetPlayer.telegramId),
+				targetPlayer.telegramId.toString(),
 				String(sentMessage.message_id)
 			);
 		}

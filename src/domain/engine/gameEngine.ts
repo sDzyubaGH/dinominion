@@ -11,12 +11,12 @@ import {
 import { validateAction } from './validators.js';
 
 interface InitialBattleInput {
-	battleId: string;
-	player1Id: string;
-	player2Id: string;
+	battleId: number;
+	player1Id: number;
+	player2Id: number;
 	player1Deck: string[];
 	player2Deck: string[];
-	startingPlayerId: string;
+	startingPlayerId: number;
 	cardLookup: (cardId: string) => CardDefinition;
 }
 
@@ -79,28 +79,28 @@ export function resolveEndTurn(
 	cardLookup: (cardId: string) => CardDefinition
 ): BattleState {
 	const nextPlayerId = Object.keys(state.players).find(
-		(playerId) => playerId !== state.currentPlayerId
+		(playerId) => Number(playerId) !== state.currentPlayerId
 	);
 	if (!nextPlayerId) {
 		throw new Error('Соперник не найден.');
 	}
 
-	state.currentPlayerId = nextPlayerId;
+	state.currentPlayerId = Number(nextPlayerId);
 	state.turn += 1;
-	startTurn(state, nextPlayerId, cardLookup);
-	state.log.unshift(`Ход переходит к игроку ${nextPlayerId}.`);
+	startTurn(state, Number(nextPlayerId), cardLookup);
+	state.log.unshift(`Ход переходит к игроку ${Number(nextPlayerId)}.`);
 	return state;
 }
 
 export function getAvailableActions(
 	state: BattleState,
-	playerId: string,
+	playerId: number,
 	cardLookup: (cardId: string) => CardDefinition
 ): {
 	canEndTurn: boolean;
-	playableCardIds: string[];
-	attackers: string[];
-	targetsByAttacker: Record<string, Array<{ type: 'hero' } | { type: 'unit'; unitId: string }>>;
+	playableCardIds: number[];
+	attackers: number[];
+	targetsByAttacker: Record<number, Array<{ type: 'hero' } | { type: 'unit'; unitId: number }>>;
 } {
 	const player = state.players[playerId];
 	if (!player || state.currentPlayerId !== playerId || state.status !== 'active') {
@@ -125,8 +125,8 @@ export function getAvailableActions(
 	);
 	const attackers = player.board.filter((unit) => unit.canAttack).map((unit) => unit.instanceId);
 	const targetsByAttacker: Record<
-		string,
-		Array<{ type: 'hero' } | { type: 'unit'; unitId: string }>
+		number,
+		Array<{ type: 'hero' } | { type: 'unit'; unitId: number }>
 	> = {};
 
 	for (const attackerId of attackers) {
@@ -147,7 +147,7 @@ export function getAvailableActions(
 	};
 }
 
-function createParticipant(playerId: string, deck: string[]): BattleParticipantState {
+function createParticipant(playerId: number, deck: string[]): BattleParticipantState {
 	return {
 		id: playerId,
 		health: STARTING_HEALTH,
@@ -161,7 +161,7 @@ function createParticipant(playerId: string, deck: string[]): BattleParticipantS
 
 function startTurn(
 	state: BattleState,
-	playerId: string,
+	playerId: number,
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
@@ -181,7 +181,7 @@ function startTurn(
 
 function resolveEggs(
 	state: BattleState,
-	playerId: string,
+	playerId: number,
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
@@ -219,8 +219,8 @@ function resolveEggs(
 
 function applyPlayCard(
 	state: BattleState,
-	playerId: string,
-	cardInstanceId: string,
+	playerId: number,
+	cardInstanceId: number,
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
@@ -236,9 +236,9 @@ function applyPlayCard(
 
 function applyAttack(
 	state: BattleState,
-	playerId: string,
-	attackerId: string,
-	target: { type: 'hero' } | { type: 'unit'; unitId: string },
+	playerId: number,
+	attackerId: number,
+	target: { type: 'hero' } | { type: 'unit'; unitId: number },
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
@@ -301,7 +301,7 @@ function checkWinner(state: BattleState): void {
 	state.log.unshift(`Бой завершен. Победитель: ${winner?.id ?? 'неизвестно'}.`);
 }
 
-function drawCards(state: BattleState, playerId: string, count: number): void {
+function drawCards(state: BattleState, playerId: number, count: number): void {
 	const player = state.players[playerId];
 
 	for (let index = 0; index < count; index += 1) {
@@ -311,7 +311,7 @@ function drawCards(state: BattleState, playerId: string, count: number): void {
 		}
 
 		const handCard: HandCard = {
-			instanceId: `card-${state.nextCardInstanceId}`,
+			instanceId: state.nextCardInstanceId,
 			cardId
 		};
 		state.nextCardInstanceId += 1;
@@ -319,7 +319,7 @@ function drawCards(state: BattleState, playerId: string, count: number): void {
 	}
 }
 
-function toUnit(card: HandCard, ownerId: string, definition: CardDefinition): UnitState {
+function toUnit(card: HandCard, ownerId: number, definition: CardDefinition): UnitState {
 	return {
 		instanceId: card.instanceId,
 		cardId: card.cardId,

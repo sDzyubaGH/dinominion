@@ -5,7 +5,7 @@ import { getUnitAttack, getUnitCurrentHealth } from '../../domain/engine/rules.j
 import type { BattleState } from '../../domain/types/BattleState.js';
 
 function displayName(player: Player): string {
-	return player.username ? `@${player.username}` : `tg:${player.telegramId}`;
+	return player.username ? `@${player.username}` : `tg:${player.telegramId.toString()}`;
 }
 
 export function renderBattleText(state: BattleState, player1: Player, player2: Player): string {
@@ -32,7 +32,7 @@ export function renderBattleText(state: BattleState, player1: Player, player2: P
 	].join('\n');
 }
 
-export function renderHandText(state: BattleState, viewerId: string): string {
+export function renderHandText(state: BattleState, viewerId: number): string {
 	const player = state.players[viewerId];
 	const lines = [`Рука: ${player.hand.length} карт`];
 
@@ -51,7 +51,7 @@ export function renderHandText(state: BattleState, viewerId: string): string {
 	return lines.join('\n');
 }
 
-export function renderActionSummary(state: BattleState, viewerId: string): string {
+export function renderActionSummary(state: BattleState, viewerId: number): string {
 	const available = getAvailableActions(state, viewerId, mustCard);
 	return [
 		`Можно сыграть карт: ${available.playableCardIds.length}`,
@@ -60,7 +60,7 @@ export function renderActionSummary(state: BattleState, viewerId: string): strin
 	].join('\n');
 }
 
-function renderParticipant(participant: BattleState['players'][string], player: Player): string {
+function renderParticipant(participant: BattleState['players'][number], player: Player): string {
 	return [
 		displayName(player),
 		`❤️ ${participant.health} HP`,
