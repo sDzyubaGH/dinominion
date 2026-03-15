@@ -8,7 +8,7 @@ export function registerStartHandler(bot: Bot<Context>, playerService: PlayerSer
 			return;
 		}
 
-		const player = await playerService.registerOrGet(String(ctx.from.id), ctx.from.username);
+		const player = await playerService.registerOrGet(BigInt(ctx.from.id), ctx.from.username);
 		await ctx.reply(
 			[
 				`Добро пожаловать в Dino Clash, ${player.username ? `@${player.username}` : 'командир'}.`,

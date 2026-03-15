@@ -1,5 +1,5 @@
 export interface BattlePlayer {
-	id: string;
+	id: number;
 	health: number;
 	maxEnergy: number;
 	energy: number;

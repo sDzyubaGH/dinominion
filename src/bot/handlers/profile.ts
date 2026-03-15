@@ -7,7 +7,7 @@ export function registerProfileHandler(bot: Bot<Context>, playerService: PlayerS
 			return;
 		}
 
-		const player = await playerService.getProfile(String(ctx.from.id));
+		const player = await playerService.getProfile(BigInt(ctx.from.id));
 		if (!player) {
 			await ctx.reply('Профиль не найден. Сначала выполните /start.');
 			return;
@@ -16,7 +16,7 @@ export function registerProfileHandler(bot: Bot<Context>, playerService: PlayerS
 		await ctx.reply(
 			[
 				'Профиль',
-				`Telegram ID: ${player.telegramId}`,
+				`Telegram ID: ${player.telegramId.toString()}`,
 				`Имя пользователя: ${player.username ? `@${player.username}` : '-'}`,
 				`Дата регистрации: ${player.createdAt.toISOString()}`
 			].join('\n')

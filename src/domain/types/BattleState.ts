@@ -1,7 +1,7 @@
 import type { HandCard, UnitState } from '../entities/Card.js';
 
 export interface BattleParticipantState {
-	id: string;
+	id: number;
 	health: number;
 	maxEnergy: number;
 	energy: number;
@@ -11,12 +11,12 @@ export interface BattleParticipantState {
 }
 
 export interface BattleState {
-	battleId: string;
+	battleId: number;
 	turn: number;
-	currentPlayerId: string;
+	currentPlayerId: number;
 	status: 'active' | 'finished';
-	winnerId?: string;
+	winnerId?: number;
 	nextCardInstanceId: number;
-	players: Record<string, BattleParticipantState>;
+	players: Record<number, BattleParticipantState>;
 	log: string[];
 }

@@ -4,15 +4,13 @@ import { prisma } from '../client.js';
 
 export class BattleRepository {
 	async create(data: {
-		id: string;
-		player1Id: string;
-		player2Id: string;
-		currentTurnPlayerId: string;
+		player1Id: number;
+		player2Id: number;
+		currentTurnPlayerId: number;
 		state: BattleState;
 	}): Promise<Battle> {
 		return prisma.battle.create({
 			data: {
-				id: data.id,
 				player1Id: data.player1Id,
 				player2Id: data.player2Id,
 				currentTurnPlayerId: data.currentTurnPlayerId,
@@ -21,13 +19,13 @@ export class BattleRepository {
 		});
 	}
 
-	async findById(id: string): Promise<Battle | null> {
+	async findById(id: number): Promise<Battle | null> {
 		return prisma.battle.findUnique({
 			where: { id }
 		});
 	}
 
-	async findActiveByPlayerId(playerId: string): Promise<Battle | null> {
+	async findActiveByPlayerId(playerId: number): Promise<Battle | null> {
 		return prisma.battle.findFirst({
 			where: {
 				status: BattleStatus.ACTIVE,
@@ -39,7 +37,7 @@ export class BattleRepository {
 		});
 	}
 
-	async saveState(id: string, state: BattleState): Promise<Battle> {
+	async saveState(id: number, state: BattleState): Promise<Battle> {
 		return prisma.battle.update({
 			where: { id },
 			data: {

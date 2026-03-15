@@ -16,7 +16,7 @@ export class MatchmakingService {
 		  }
 		| {
 				status: 'matched';
-				battleId: string;
+				battleId: number;
 		  }
 	> {
 		const result = await this.queue.enqueueOrMatch(player.id);

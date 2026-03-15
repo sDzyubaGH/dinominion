@@ -12,7 +12,7 @@ export function registerDeckHandler(
 			return;
 		}
 
-		const player = await playerService.registerOrGet(String(ctx.from.id), ctx.from.username);
+		const player = await playerService.registerOrGet(BigInt(ctx.from.id), ctx.from.username);
 		const { deck, cards } = await deckService.getDeck(player.id);
 		await ctx.reply(
 			[`Колода: ${deck.name}`, ...cards.map((card, index) => `${index + 1}. ${card}`)].join(

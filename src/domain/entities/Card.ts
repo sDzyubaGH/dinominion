@@ -14,14 +14,14 @@ export interface CardDefinition {
 }
 
 export interface HandCard {
-	instanceId: string;
+	instanceId: number;
 	cardId: string;
 }
 
 export interface UnitState {
-	instanceId: string;
+	instanceId: number;
 	cardId: string;
-	ownerId: string;
+	ownerId: number;
 	damageTaken: number;
 	canAttack: boolean;
 	eggState?: {

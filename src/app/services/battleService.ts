@@ -1,6 +1,5 @@
 import type { Battle, Player } from '@prisma/client';
 import type { Redis } from 'ioredis';
-import { randomUUID } from 'node:crypto';
 import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 import { applyAction, createInitialBattleState } from '../../domain/engine/gameEngine.js';
 import type { BattleState } from '../../domain/types/BattleState.js';
@@ -20,18 +19,18 @@ export interface BattleSnapshot {
 export type BattleActionInput =
 	| {
 			type: 'play_card';
-			cardInstanceId: string;
+			cardInstanceId: number;
 	  }
 	| {
 			type: 'attack';
-			attackerId: string;
+			attackerId: number;
 			target:
 				| {
 						type: 'hero';
 				  }
 				| {
 						type: 'unit';
-						unitId: string;
+						unitId: number;
 				  };
 	  }
 	| {
@@ -48,7 +47,6 @@ export class BattleService {
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
-		const battleId = randomUUID();
 		const deck1 = await this.deckRepository.findByPlayerId(player1.id);
 		const deck2 = await this.deckRepository.findByPlayerId(player2.id);
 		if (!deck1 || !deck2) {
@@ -56,8 +54,14 @@ export class BattleService {
 		}
 
 		const startingPlayerId = player1.id;
+		const battle = await this.battleRepository.create({
+			player1Id: player1.id,
+			player2Id: player2.id,
+			currentTurnPlayerId: startingPlayerId,
+			state: {} as BattleState
+		});
 		const state = createInitialBattleState({
-			battleId,
+			battleId: battle.id,
 			player1Id: player1.id,
 			player2Id: player2.id,
 			player1Deck: shuffleDeck(deck1.cardsJson as string[]),
@@ -66,27 +70,21 @@ export class BattleService {
 			cardLookup: mustCard
 		});
 
-		const battle = await this.battleRepository.create({
-			id: battleId,
-			player1Id: player1.id,
-			player2Id: player2.id,
-			currentTurnPlayerId: state.currentPlayerId,
-			state
-		});
+		const persistedBattle = await this.battleRepository.saveState(battle.id, state);
 
-		await this.cacheState(battleId, state);
-		await this.redis.set(this.activeBattleKey(player1.id), battleId);
-		await this.redis.set(this.activeBattleKey(player2.id), battleId);
+		await this.cacheState(battle.id, state);
+		await this.redis.set(this.activeBattleKey(player1.id), String(battle.id));
+		await this.redis.set(this.activeBattleKey(player2.id), String(battle.id));
 
 		return {
-			battle,
+			battle: persistedBattle,
 			state,
 			player1,
 			player2
 		};
 	}
 
-	async getActiveBattleForTelegramId(telegramId: string): Promise<BattleSnapshot | null> {
+	async getActiveBattleForTelegramId(telegramId: bigint): Promise<BattleSnapshot | null> {
 		const player = await this.playerRepository.findByTelegramId(telegramId);
 		if (!player) {
 			return null;
@@ -99,10 +97,10 @@ export class BattleService {
 			return null;
 		}
 
-		return this.getBattleSnapshotById(battleId);
+		return this.getBattleSnapshotById(Number(battleId));
 	}
 
-	async getBattleSnapshotById(battleId: string): Promise<BattleSnapshot | null> {
+	async getBattleSnapshotById(battleId: number): Promise<BattleSnapshot | null> {
 		const battle = await this.battleRepository.findById(battleId);
 		if (!battle) {
 			return null;
@@ -124,8 +122,8 @@ export class BattleService {
 	}
 
 	async applyActionForTelegramId(params: {
-		battleId: string;
-		telegramId: string;
+		battleId: number;
+		telegramId: bigint;
 		action: BattleActionInput;
 	}): Promise<{ snapshot: BattleSnapshot; actor: Player }> {
 		const actor = await this.playerRepository.findByTelegramId(params.telegramId);
@@ -178,36 +176,40 @@ export class BattleService {
 	}
 
 	async storeBattleMessageRef(
-		battleId: string,
-		playerId: string,
+		battleId: number,
+		playerId: number,
 		chatId: string,
 		messageId: string
 	): Promise<void> {
-		await this.redis.hset(this.battleViewsKey(battleId), playerId, `${chatId}:${messageId}`);
+		await this.redis.hset(
+			this.battleViewsKey(battleId),
+			String(playerId),
+			`${chatId}:${messageId}`
+		);
 	}
 
 	async getBattleMessageRefs(
-		battleId: string
-	): Promise<Array<{ playerId: string; chatId: number; messageId: number }>> {
+		battleId: number
+	): Promise<Array<{ playerId: number; chatId: number; messageId: number }>> {
 		const entries = await this.redis.hgetall(this.battleViewsKey(battleId));
 		return Object.entries(entries).map(([playerId, value]) => {
 			const serialized = String(value);
 			const [chatId, messageId] = serialized.split(':');
 			return {
-				playerId,
+				playerId: Number(playerId),
 				chatId: Number(chatId),
 				messageId: Number(messageId)
 			};
 		});
 	}
 
-	private async findAndCacheActiveBattle(playerId: string): Promise<string | null> {
+	private async findAndCacheActiveBattle(playerId: number): Promise<number | null> {
 		const battle = await this.battleRepository.findActiveByPlayerId(playerId);
 		if (!battle) {
 			return null;
 		}
 
-		await this.redis.set(this.activeBattleKey(playerId), battle.id);
+		await this.redis.set(this.activeBattleKey(playerId), String(battle.id));
 		return battle.id;
 	}
 
@@ -222,23 +224,23 @@ export class BattleService {
 		return state;
 	}
 
-	private async cacheState(battleId: string, state: BattleState): Promise<void> {
+	private async cacheState(battleId: number, state: BattleState): Promise<void> {
 		await this.redis.set(this.battleStateKey(battleId), JSON.stringify(state));
 	}
 
-	private activeBattleKey(playerId: string): string {
+	private activeBattleKey(playerId: number): string {
 		return `dino:player:${playerId}:active_battle`;
 	}
 
-	private battleStateKey(battleId: string): string {
+	private battleStateKey(battleId: number): string {
 		return `dino:battle:${battleId}:state`;
 	}
 
-	private battleViewsKey(battleId: string): string {
+	private battleViewsKey(battleId: number): string {
 		return `dino:battle:${battleId}:views`;
 	}
 
-	private battleLockKey(battleId: string): string {
+	private battleLockKey(battleId: number): string {
 		return `dino:battle:${battleId}:lock`;
 	}
 }
