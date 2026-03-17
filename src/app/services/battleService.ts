@@ -1,9 +1,9 @@
 import type { Battle, Player } from '@prisma/client';
 import type { Redis } from 'ioredis';
 import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
-import { applyAction, createInitialBattleState } from '../../domain/engine/gameEngine.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
-import type { GameAction } from '../../domain/types/GameAction.js';
+import { applyAction, createInitialBattleState } from '../../core/engine/gameEngine.js';
+import type { BattleState } from '../../core/types/BattleState.js';
+import type { GameAction } from '../../core/types/GameAction.js';
 import { BattleRepository } from '../../infra/prisma/repositories/battleRepository.js';
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';

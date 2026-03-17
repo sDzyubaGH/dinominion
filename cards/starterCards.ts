@@ -1,4 +1,4 @@
-import type { CardDefinition } from '../src/domain/entities/Card.js';
+import type { CardDefinition } from '../src/core/entities/Card.js';
 
 export const STARTER_CARDS: CardDefinition[] = [
 	{

@@ -1,6 +1,6 @@
 import { InlineKeyboard } from 'grammy';
-import { getAvailableActions } from '../../domain/engine/gameEngine.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
+import { getAvailableActions } from '../../core/engine/gameEngine.js';
+import type { BattleState } from '../../core/types/BattleState.js';
 import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 
 export type BattleViewMode =

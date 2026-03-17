@@ -1,8 +1,8 @@
 import type { Player } from '@prisma/client';
 import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
-import { getAvailableActions } from '../../domain/engine/gameEngine.js';
-import { getUnitAttack, getUnitCurrentHealth } from '../../domain/engine/rules.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
+import { getAvailableActions } from '../../core/engine/gameEngine.js';
+import { getUnitAttack, getUnitCurrentHealth } from '../../core/engine/rules.js';
+import type { BattleState } from '../../core/types/BattleState.js';
 
 function displayName(player: Player): string {
 	return player.username ? `@${player.username}` : `tg:${player.telegramId.toString()}`;

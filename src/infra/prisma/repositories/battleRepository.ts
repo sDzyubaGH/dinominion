@@ -1,5 +1,5 @@
 import { BattleStatus, Prisma, type Battle } from '@prisma/client';
-import type { BattleState } from '../../../domain/types/BattleState.js';
+import type { BattleState } from '../../../core/types/BattleState.js';
 import { prisma } from '../client.js';
 
 export class BattleRepository {
