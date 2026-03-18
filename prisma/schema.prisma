@@ -12,6 +12,34 @@ enum BattleStatus {
 	FINISHED
 }
 
+enum CardType {
+	UNIT
+	BUFF
+}
+
+enum EffectType {
+	GUARD_PASSIVE
+	HATCH
+	EVOLVE
+	BUFF_ATTACK
+	BUFF_HEALTH
+}
+
+enum TriggerType {
+	PASSIVE
+	ON_PLAY
+	TURN_START_OWNER
+	ON_DEATH
+}
+
+enum TargetType {
+	SELF
+	ALLY_UNIT
+	ENEMY_UNIT
+	ENEMY_HERO
+	NONE
+}
+
 model Player {
 	id               Int      @id @default(autoincrement())
 	telegramId       BigInt   @unique
@@ -51,4 +79,39 @@ model Battle {
 
 	@@index([player1Id, status])
 	@@index([player2Id, status])
+}
+
+model CardEffect {
+	id Int @id @default(autoincrement())
+	cardId Int 
+	effectType EffectType
+	triggerType TriggerType
+	targetType TargetType
+	value Int?
+	durationEffect Int?
+	params Json?
+	sortOrder Int @default(0)
+	card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+	@@index([cardId, triggerType])
+	@@index([effectType])
+
+}
+
+model Card {
+	id Int @id @default(autoincrement())
+	slug String @unique
+	name String
+	type CardType
+	cost Int
+	attack Int?
+	health Int?
+	species String?
+	abilityText String?
+	isActive Boolean @default(true)
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+	effects CardEffect[] 
+
+	@@index([type, isActive])
 }

@@ -1,6 +1,6 @@
 import type { Battle, Player } from '@prisma/client';
 import type { Redis } from 'ioredis';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
+import type { CardDefinition } from '../../domain/entities/Card.js';
 import { applyAction, createInitialBattleState } from '../../domain/engine/gameEngine.js';
 import type { BattleState } from '../../domain/types/BattleState.js';
 import type { GameAction } from '../../domain/types/GameAction.js';
@@ -8,6 +8,7 @@ import { BattleRepository } from '../../infra/prisma/repositories/battleReposito
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
 import { RedisLockService } from '../../infra/redis/locks.js';
+import { CardCatalogService } from './cardCatalogService.js';
 
 export interface BattleSnapshot {
 	battle: Battle;
@@ -43,10 +44,12 @@ export class BattleService {
 		private readonly playerRepository: PlayerRepository,
 		private readonly deckRepository: DeckRepository,
 		private readonly redis: Redis,
-		private readonly lockService: RedisLockService
+		private readonly lockService: RedisLockService,
+		private readonly cardCatalogService: CardCatalogService
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
+		const cardLookup = await this.cardCatalogService.getLookup();
 		const deck1 = await this.deckRepository.findByPlayerId(player1.id);
 		const deck2 = await this.deckRepository.findByPlayerId(player2.id);
 		if (!deck1 || !deck2) {
@@ -67,7 +70,7 @@ export class BattleService {
 			player1Deck: shuffleDeck(deck1.cardsJson as string[]),
 			player2Deck: shuffleDeck(deck2.cardsJson as string[]),
 			startingPlayerId,
-			cardLookup: mustCard
+			cardLookup
 		});
 
 		const persistedBattle = await this.battleRepository.saveState(battle.id, state);
@@ -147,7 +150,7 @@ export class BattleService {
 					...params.action,
 					playerId: actor.id
 				} as GameAction,
-				mustCard
+				await this.cardCatalogService.getLookup()
 			);
 			if (!result.ok) {
 				throw new Error(result.error ?? 'Action failed.');
@@ -203,6 +206,14 @@ export class BattleService {
 		});
 	}
 
+	async getCardLookup(): Promise<(cardId: string) => CardDefinition> {
+		return this.cardCatalogService.getLookup();
+	}
+
+	async getCardName(cardId: string): Promise<string> {
+		return this.cardCatalogService.getCardName(cardId);
+	}
+
 	private async findAndCacheActiveBattle(playerId: number): Promise<number | null> {
 		const battle = await this.battleRepository.findActiveByPlayerId(playerId);
 		if (!battle) {
@@ -243,14 +254,6 @@ export class BattleService {
 	private battleLockKey(battleId: number): string {
 		return `dino:battle:${battleId}:lock`;
 	}
-}
-
-function mustCard(cardId: string) {
-	const card = STARTER_CARD_MAP.get(cardId);
-	if (!card) {
-		throw new Error(`Unknown card: ${cardId}`);
-	}
-	return card;
 }
 
 function shuffleDeck(deck: string[]): string[] {

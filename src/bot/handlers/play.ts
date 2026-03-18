@@ -34,15 +34,16 @@ export function registerPlayHandler(
 		if (!snapshot) {
 			throw new Error('Created battle could not be loaded.');
 		}
+		const cardLookup = await battleService.getCardLookup();
 
 		for (const targetPlayer of [snapshot.player1, snapshot.player2]) {
 			const sentMessage = await bot.api.sendMessage(
 				Number(targetPlayer.telegramId),
-				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2),
+				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 				{
 					reply_markup: createBattleKeyboard(snapshot.state, targetPlayer.id, {
 						type: 'default'
-					})
+					}, cardLookup)
 				}
 			);
 

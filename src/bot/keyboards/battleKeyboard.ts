@@ -1,7 +1,7 @@
 import { InlineKeyboard } from 'grammy';
+import type { CardDefinition } from '../../domain/entities/Card.js';
 import { getAvailableActions } from '../../domain/engine/gameEngine.js';
 import type { BattleState } from '../../domain/types/BattleState.js';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 
 export type BattleViewMode =
 	| {
@@ -21,7 +21,8 @@ export type BattleViewMode =
 export function createBattleKeyboard(
 	state: BattleState,
 	viewerId: number,
-	mode: BattleViewMode
+	mode: BattleViewMode,
+	cardLookup: (cardId: string) => CardDefinition
 ): InlineKeyboard {
 	const keyboard = new InlineKeyboard();
 	const isCurrentPlayer = state.currentPlayerId === viewerId && state.status === 'active';
@@ -30,10 +31,7 @@ export function createBattleKeyboard(
 		const player = state.players[viewerId];
 		if (isCurrentPlayer) {
 			for (const card of player?.hand ?? []) {
-				const definition = STARTER_CARD_MAP.get(card.cardId);
-				if (!definition) {
-					continue;
-				}
+				const definition = cardLookup(card.cardId);
 				keyboard
 					.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`)
 					.row();
@@ -43,7 +41,7 @@ export function createBattleKeyboard(
 	}
 
 	if (mode.type === 'attackers') {
-		const actions = getAvailableActions(state, viewerId, mustCard);
+		const actions = getAvailableActions(state, viewerId, cardLookup);
 		if (isCurrentPlayer) {
 			for (const attackerId of actions.attackers) {
 				const unit = state.players[viewerId]?.board.find(
@@ -52,7 +50,7 @@ export function createBattleKeyboard(
 				if (!unit) {
 					continue;
 				}
-				keyboard.text(mustCard(unit.cardId).name, `b:aa:${attackerId}`).row();
+				keyboard.text(cardLookup(unit.cardId).name, `b:aa:${attackerId}`).row();
 			}
 		}
 		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
@@ -63,7 +61,7 @@ export function createBattleKeyboard(
 			return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
 		}
 
-		const actions = getAvailableActions(state, viewerId, mustCard);
+		const actions = getAvailableActions(state, viewerId, cardLookup);
 		const targets = actions.targetsByAttacker[mode.attackerId] ?? [];
 		const opponentId = Object.keys(state.players).find(
 			(playerId) => Number(playerId) !== viewerId
@@ -81,7 +79,7 @@ export function createBattleKeyboard(
 				continue;
 			}
 			keyboard
-				.text(mustCard(unit.cardId).name, `b:tu:${mode.attackerId}:${unit.instanceId}`)
+				.text(cardLookup(unit.cardId).name, `b:tu:${mode.attackerId}:${unit.instanceId}`)
 				.row();
 		}
 
@@ -96,12 +94,4 @@ export function createBattleKeyboard(
 	// keyboard.text('Обновить бой', 'b:r');
 
 	return keyboard;
-}
-
-function mustCard(cardId: string) {
-	const card = STARTER_CARD_MAP.get(cardId);
-	if (!card) {
-		throw new Error(`Unknown card: ${cardId}`);
-	}
-	return card;
 }

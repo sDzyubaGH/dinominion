@@ -1,5 +1,5 @@
 import type { Player } from '@prisma/client';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
+import type { CardDefinition } from '../../domain/entities/Card.js';
 import { getAvailableActions } from '../../domain/engine/gameEngine.js';
 import { getUnitAttack, getUnitCurrentHealth } from '../../domain/engine/rules.js';
 import type { BattleState } from '../../domain/types/BattleState.js';
@@ -8,7 +8,12 @@ function displayName(player: Player): string {
 	return player.username ? `@${player.username}` : `tg:${player.telegramId.toString()}`;
 }
 
-export function renderBattleText(state: BattleState, player1: Player, player2: Player): string {
+export function renderBattleText(
+	state: BattleState,
+	player1: Player,
+	player2: Player,
+	cardLookup: (cardId: string) => CardDefinition
+): string {
 	const currentPlayer = state.players[state.currentPlayerId];
 	const first = state.players[player1.id];
 	const second = state.players[player2.id];
@@ -21,9 +26,9 @@ export function renderBattleText(state: BattleState, player1: Player, player2: P
 		`Ход: ${displayName(currentPlayer.id === player1.id ? player1 : player2)}`,
 		`Энергия: ${currentPlayer.energy}/${currentPlayer.maxEnergy}`,
 		'',
-		renderParticipant(first, player1),
+		renderParticipant(first, player1, cardLookup),
 		'',
-		renderParticipant(second, player2),
+		renderParticipant(second, player2, cardLookup),
 		'',
 		`Событие: ${state.log[0] ?? 'Бой начался.'}`,
 		state.status === 'finished' && winnerPlayer
@@ -32,15 +37,16 @@ export function renderBattleText(state: BattleState, player1: Player, player2: P
 	].join('\n');
 }
 
-export function renderHandText(state: BattleState, viewerId: number): string {
+export function renderHandText(
+	state: BattleState,
+	viewerId: number,
+	cardLookup: (cardId: string) => CardDefinition
+): string {
 	const player = state.players[viewerId];
 	const lines = [`Рука: ${player.hand.length} карт`];
 
 	for (const [index, card] of player.hand.entries()) {
-		const definition = STARTER_CARD_MAP.get(card.cardId);
-		if (!definition) {
-			continue;
-		}
+		const definition = cardLookup(card.cardId);
 		lines.push(
 			`${index + 1}. ${definition.name} | Стоимость ${definition.cost} | ${definition.attack}/${definition.health}${
 				definition.abilityText ? ` | ${definition.abilityText}` : ''
@@ -51,8 +57,12 @@ export function renderHandText(state: BattleState, viewerId: number): string {
 	return lines.join('\n');
 }
 
-export function renderActionSummary(state: BattleState, viewerId: number): string {
-	const available = getAvailableActions(state, viewerId, mustCard);
+export function renderActionSummary(
+	state: BattleState,
+	viewerId: number,
+	cardLookup: (cardId: string) => CardDefinition
+): string {
+	const available = getAvailableActions(state, viewerId, cardLookup);
 	return [
 		`Можно сыграть карт: ${available.playableCardIds.length}`,
 		`Готовых атакующих: ${available.attackers.length}`,
@@ -60,7 +70,11 @@ export function renderActionSummary(state: BattleState, viewerId: number): strin
 	].join('\n');
 }
 
-function renderParticipant(participant: BattleState['players'][number], player: Player): string {
+function renderParticipant(
+	participant: BattleState['players'][number],
+	player: Player,
+	cardLookup: (cardId: string) => CardDefinition
+): string {
 	return [
 		displayName(player),
 		`❤️ ${participant.health} HP`,
@@ -69,12 +83,12 @@ function renderParticipant(participant: BattleState['players'][number], player: 
 			? '- пусто'
 			: participant.board
 					.map((unit, index) => {
-						const definition = mustCard(unit.cardId);
+						const definition = cardLookup(unit.cardId);
 						if (unit.eggState) {
 							return `${index + 1}. ${definition.name} (вылупится через ${unit.eggState.turnsRemaining})`;
 						}
 
-						const attack = getUnitAttack(participant, unit, mustCard);
+						const attack = getUnitAttack(participant, unit, cardLookup);
 						const health = getUnitCurrentHealth(definition, unit);
 						const guard = definition.keywords?.includes('guard') ? ' [Охрана]' : '';
 						return `${index + 1}. ${definition.name} ${attack}/${health}${guard}`;
@@ -82,12 +96,4 @@ function renderParticipant(participant: BattleState['players'][number], player: 
 					.join('\n'),
 		`Карт в руке: ${participant.hand.length}`
 	].join('\n');
-}
-
-function mustCard(cardId: string) {
-	const card = STARTER_CARD_MAP.get(cardId);
-	if (!card) {
-		throw new Error(`Unknown card: ${cardId}`);
-	}
-	return card;
 }

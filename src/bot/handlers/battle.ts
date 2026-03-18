@@ -1,5 +1,4 @@
-import type { Bot, Context } from 'grammy';
-import type { Api } from 'grammy';
+import type { Api, Bot, Context } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
 import { createBattleKeyboard, type BattleViewMode } from '../keyboards/battleKeyboard.js';
@@ -8,7 +7,6 @@ import {
 	renderBattleText,
 	renderHandText
 } from '../../infra/telegram/renderer.js';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 
 export function registerBattleHandler(
 	bot: Bot<Context>,
@@ -26,13 +24,17 @@ export function registerBattleHandler(
 			await ctx.reply('Активный бой не найден.');
 			return;
 		}
+		const cardLookup = await battleService.getCardLookup();
 
 		const sentMessage = await ctx.reply(
-			renderBattleText(snapshot.state, snapshot.player1, snapshot.player2),
+			renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 			{
-				reply_markup: createBattleKeyboard(snapshot.state, player.id, {
-					type: 'default'
-				})
+				reply_markup: createBattleKeyboard(
+					snapshot.state,
+					player.id,
+					{ type: 'default' },
+					cardLookup
+				)
 			}
 		);
 
@@ -51,7 +53,7 @@ export function registerBattleHandler(
 
 		const actor = await playerService.getProfile(BigInt(ctx.from.id));
 		if (!actor) {
-			await ctx.answerCallbackQuery({ text: 'Профиль не найден.' });
+			await ctx.answerCallbackQuery({ text: '������� �� ������.' });
 			return;
 		}
 
@@ -69,22 +71,22 @@ export function registerBattleHandler(
 		}
 
 		if (parsed.command === 'refresh' || parsed.command === 'back') {
-			await renderView(ctx, snapshot, actor.id, { type: 'default' });
+			await renderView(ctx, battleService, snapshot, actor.id, { type: 'default' });
 			return;
 		}
 
 		if (parsed.command === 'hand') {
-			await renderView(ctx, snapshot, actor.id, { type: 'hand' });
+			await renderView(ctx, battleService, snapshot, actor.id, { type: 'hand' });
 			return;
 		}
 
 		if (parsed.command === 'attack') {
-			await renderView(ctx, snapshot, actor.id, { type: 'attackers' });
+			await renderView(ctx, battleService, snapshot, actor.id, { type: 'attackers' });
 			return;
 		}
 
 		if (parsed.command === 'attacker' && parsed.attackerId) {
-			await renderView(ctx, snapshot, actor.id, {
+			await renderView(ctx, battleService, snapshot, actor.id, {
 				type: 'targets',
 				attackerId: parsed.attackerId
 			});
@@ -178,27 +180,29 @@ export function registerBattleHandler(
 
 async function renderView(
 	ctx: Context,
+	battleService: BattleService,
 	snapshot: NonNullable<Awaited<ReturnType<BattleService['getBattleSnapshotById']>>>,
 	viewerId: number,
 	mode: BattleViewMode
 ): Promise<void> {
-	const attackerName =
+	const cardLookup = await battleService.getCardLookup();
+	const attacker =
 		mode.type === 'targets'
 			? snapshot.state.players[viewerId].board.find(
 					(unit) => unit.instanceId === mode.attackerId
-				)
+			  )
 			: undefined;
 	const text =
 		mode.type === 'hand'
-			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\n${renderHandText(snapshot.state, viewerId)}`
+			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderHandText(snapshot.state, viewerId, cardLookup)}`
 			: mode.type === 'attackers'
-				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\n${renderActionSummary(snapshot.state, viewerId)}`
+				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderActionSummary(snapshot.state, viewerId, cardLookup)}`
 				: mode.type === 'targets'
-					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\nВыберите цель для ${attackerName ? (STARTER_CARD_MAP.get(attackerName.cardId)?.name ?? mode.attackerId) : mode.attackerId}.`
-					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2);
+					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для ${attacker ? cardLookup(attacker.cardId).name : mode.attackerId}.`
+					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup);
 
 	await ctx.editMessageText(text, {
-		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode)
+		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode, cardLookup)
 	});
 	await ctx.answerCallbackQuery();
 }
@@ -212,6 +216,7 @@ async function refreshBattleViews(
 	if (!snapshot) {
 		return;
 	}
+	const cardLookup = await battleService.getCardLookup();
 
 	const refs = await battleService.getBattleMessageRefs(battleId);
 	for (const ref of refs) {
@@ -219,11 +224,14 @@ async function refreshBattleViews(
 			await api.editMessageText(
 				ref.chatId,
 				ref.messageId,
-				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2),
+				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 				{
-					reply_markup: createBattleKeyboard(snapshot.state, ref.playerId, {
-						type: 'default'
-					})
+					reply_markup: createBattleKeyboard(
+						snapshot.state,
+						ref.playerId,
+						{ type: 'default' },
+						cardLookup
+					)
 				}
 			);
 		} catch {
