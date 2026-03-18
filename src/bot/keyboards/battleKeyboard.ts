@@ -1,7 +1,7 @@
 import { InlineKeyboard } from 'grammy';
 import { getAvailableActions } from '../../core/engine/gameEngine.js';
+import type { CardDefinition } from '../../core/entities/Card.js';
 import type { BattleState } from '../../core/types/BattleState.js';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 
 export type BattleViewMode =
 	| {
@@ -21,7 +21,8 @@ export type BattleViewMode =
 export function createBattleKeyboard(
 	state: BattleState,
 	viewerId: number,
-	mode: BattleViewMode
+	mode: BattleViewMode,
+	cardLookup: (cardId: string) => CardDefinition
 ): InlineKeyboard {
 	const keyboard = new InlineKeyboard();
 	const isCurrentPlayer = state.currentPlayerId === viewerId && state.status === 'active';
@@ -30,20 +31,15 @@ export function createBattleKeyboard(
 		const player = state.players[viewerId];
 		if (isCurrentPlayer) {
 			for (const card of player?.hand ?? []) {
-				const definition = STARTER_CARD_MAP.get(card.cardId);
-				if (!definition) {
-					continue;
-				}
-				keyboard
-					.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`)
-					.row();
+				const definition = cardLookup(card.cardId);
+				keyboard.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`).row();
 			}
 		}
-		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:b');
 	}
 
 	if (mode.type === 'attackers') {
-		const actions = getAvailableActions(state, viewerId, mustCard);
+		const actions = getAvailableActions(state, viewerId, cardLookup);
 		if (isCurrentPlayer) {
 			for (const attackerId of actions.attackers) {
 				const unit = state.players[viewerId]?.board.find(
@@ -52,18 +48,18 @@ export function createBattleKeyboard(
 				if (!unit) {
 					continue;
 				}
-				keyboard.text(mustCard(unit.cardId).name, `b:aa:${attackerId}`).row();
+				keyboard.text(cardLookup(unit.cardId).name, `b:aa:${attackerId}`).row();
 			}
 		}
-		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:b');
 	}
 
 	if (mode.type === 'targets') {
 		if (!isCurrentPlayer) {
-			return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+			return keyboard.text('Назад', 'b:b');
 		}
 
-		const actions = getAvailableActions(state, viewerId, mustCard);
+		const actions = getAvailableActions(state, viewerId, cardLookup);
 		const targets = actions.targetsByAttacker[mode.attackerId] ?? [];
 		const opponentId = Object.keys(state.players).find(
 			(playerId) => Number(playerId) !== viewerId
@@ -81,11 +77,11 @@ export function createBattleKeyboard(
 				continue;
 			}
 			keyboard
-				.text(mustCard(unit.cardId).name, `b:tu:${mode.attackerId}:${unit.instanceId}`)
+				.text(cardLookup(unit.cardId).name, `b:tu:${mode.attackerId}:${unit.instanceId}`)
 				.row();
 		}
 
-		return keyboard.text('Назад', 'b:a')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:a');
 	}
 
 	keyboard.text('Посмотреть руку', 'b:h').row();
@@ -93,15 +89,6 @@ export function createBattleKeyboard(
 		keyboard.text('Атаковать', 'b:a').row();
 		keyboard.text('Завершить ход', 'b:e').row();
 	}
-	// keyboard.text('Обновить бой', 'b:r');
 
 	return keyboard;
-}
-
-function mustCard(cardId: string) {
-	const card = STARTER_CARD_MAP.get(cardId);
-	if (!card) {
-		throw new Error(`Unknown card: ${cardId}`);
-	}
-	return card;
 }

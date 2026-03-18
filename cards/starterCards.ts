@@ -8,7 +8,15 @@ export const STARTER_CARDS: CardDefinition[] = [
 		attack: 2,
 		health: 1,
 		species: 'Raptor',
-		abilityText: 'Стая: +1 к атаке, пока на вашей стороне есть другой Раптор.'
+		abilityText: 'Стая: +1 к атаке, пока на вашей стороне есть другой Раптор.',
+		abilities: [
+			{
+				type: 'pack',
+				attackBonus: 1,
+				minAllies: 1,
+				sameSpecies: true
+			}
+		]
 	},
 	{
 		id: 'alpha-raptor',
@@ -17,7 +25,15 @@ export const STARTER_CARDS: CardDefinition[] = [
 		attack: 4,
 		health: 3,
 		species: 'Raptor',
-		abilityText: 'Стая: +1 к атаке, пока на вашей стороне есть другой Раптор.'
+		abilityText: 'Стая: +1 к атаке, пока на вашей стороне есть другой Раптор.',
+		abilities: [
+			{
+				type: 'pack',
+				attackBonus: 1,
+				minAllies: 1,
+				sameSpecies: true
+			}
+		]
 	},
 	{
 		id: 'ridge-triceratops',
@@ -35,7 +51,7 @@ export const STARTER_CARDS: CardDefinition[] = [
 		health: 5,
 		species: 'Ceratops',
 		abilityText: 'Охрана',
-		keywords: ['guard']
+		abilities: [{ type: 'guard' }]
 	},
 	{
 		id: 'cliff-stalker',
@@ -69,10 +85,13 @@ export const STARTER_CARDS: CardDefinition[] = [
 		health: 2,
 		species: 'Egg',
 		abilityText: 'Яйцо: вылупляется в Болотного Детеныша через 1 полный цикл ходов.',
-		egg: {
-			hatchesIntoCardId: 'swamp-hatchling',
-			turnsToHatch: 1
-		}
+		abilities: [
+			{
+				type: 'hatch',
+				into: 'swamp-hatchling',
+				afterOwnerTurns: 1
+			}
+		]
 	},
 	{
 		id: 'reedback-brute',
@@ -98,5 +117,3 @@ export const STARTER_DECK_CARD_IDS: string[] = [
 	'ancient-egg',
 	'reedback-brute'
 ];
-
-export const STARTER_CARD_MAP = new Map(STARTER_CARDS.map((card) => [card.id, card]));

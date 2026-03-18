@@ -1,6 +1,7 @@
 import type { Bot, Context } from 'grammy';
 import type { Api } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
+import type { CardService } from '../../app/services/cardService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
 import { createBattleKeyboard, type BattleViewMode } from '../keyboards/battleKeyboard.js';
 import {
@@ -8,11 +9,11 @@ import {
 	renderBattleText,
 	renderHandText
 } from '../../infra/telegram/renderer.js';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 
 export function registerBattleHandler(
 	bot: Bot<Context>,
 	playerService: PlayerService,
+	cardService: CardService,
 	battleService: BattleService
 ): void {
 	bot.command('battle', async (ctx) => {
@@ -27,12 +28,11 @@ export function registerBattleHandler(
 			return;
 		}
 
+		const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
 		const sentMessage = await ctx.reply(
-			renderBattleText(snapshot.state, snapshot.player1, snapshot.player2),
+			renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 			{
-				reply_markup: createBattleKeyboard(snapshot.state, player.id, {
-					type: 'default'
-				})
+				reply_markup: createBattleKeyboard(snapshot.state, player.id, { type: 'default' }, cardLookup)
 			}
 		);
 
@@ -68,26 +68,34 @@ export function registerBattleHandler(
 			return;
 		}
 
+		const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
+
 		if (parsed.command === 'refresh' || parsed.command === 'back') {
-			await renderView(ctx, snapshot, actor.id, { type: 'default' });
+			await renderView(ctx, snapshot, actor.id, { type: 'default' }, cardLookup);
 			return;
 		}
 
 		if (parsed.command === 'hand') {
-			await renderView(ctx, snapshot, actor.id, { type: 'hand' });
+			await renderView(ctx, snapshot, actor.id, { type: 'hand' }, cardLookup);
 			return;
 		}
 
 		if (parsed.command === 'attack') {
-			await renderView(ctx, snapshot, actor.id, { type: 'attackers' });
+			await renderView(ctx, snapshot, actor.id, { type: 'attackers' }, cardLookup);
 			return;
 		}
 
 		if (parsed.command === 'attacker' && parsed.attackerId) {
-			await renderView(ctx, snapshot, actor.id, {
-				type: 'targets',
-				attackerId: parsed.attackerId
-			});
+			await renderView(
+				ctx,
+				snapshot,
+				actor.id,
+				{
+					type: 'targets',
+					attackerId: parsed.attackerId
+				},
+				cardLookup
+			);
 			return;
 		}
 
@@ -101,7 +109,7 @@ export function registerBattleHandler(
 						cardInstanceId: parsed.cardInstanceId
 					}
 				});
-				await refreshBattleViews(bot.api, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Карта разыграна.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -122,7 +130,7 @@ export function registerBattleHandler(
 						target: { type: 'hero' }
 					}
 				});
-				await refreshBattleViews(bot.api, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -143,7 +151,7 @@ export function registerBattleHandler(
 						target: { type: 'unit', unitId: parsed.targetUnitId }
 					}
 				});
-				await refreshBattleViews(bot.api, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -162,7 +170,7 @@ export function registerBattleHandler(
 						type: 'end_turn'
 					}
 				});
-				await refreshBattleViews(bot.api, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Ход завершен.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -180,7 +188,8 @@ async function renderView(
 	ctx: Context,
 	snapshot: NonNullable<Awaited<ReturnType<BattleService['getBattleSnapshotById']>>>,
 	viewerId: number,
-	mode: BattleViewMode
+	mode: BattleViewMode,
+	cardLookup: Awaited<ReturnType<CardService['getLookupForBattleState']>>
 ): Promise<void> {
 	const attackerName =
 		mode.type === 'targets'
@@ -190,21 +199,22 @@ async function renderView(
 			: undefined;
 	const text =
 		mode.type === 'hand'
-			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\n${renderHandText(snapshot.state, viewerId)}`
+			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderHandText(snapshot.state, viewerId, cardLookup)}`
 			: mode.type === 'attackers'
-				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\n${renderActionSummary(snapshot.state, viewerId)}`
+				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderActionSummary(snapshot.state, viewerId, cardLookup)}`
 				: mode.type === 'targets'
-					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2)}\n\nВыберите цель для ${attackerName ? (STARTER_CARD_MAP.get(attackerName.cardId)?.name ?? mode.attackerId) : mode.attackerId}.`
-					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2);
+					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для ${attackerName ? cardLookup(attackerName.cardId).name : mode.attackerId}.`
+					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup);
 
 	await ctx.editMessageText(text, {
-		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode)
+		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode, cardLookup)
 	});
 	await ctx.answerCallbackQuery();
 }
 
 async function refreshBattleViews(
 	api: Api,
+	cardService: CardService,
 	battleService: BattleService,
 	battleId: number
 ): Promise<void> {
@@ -213,17 +223,23 @@ async function refreshBattleViews(
 		return;
 	}
 
+	const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
 	const refs = await battleService.getBattleMessageRefs(battleId);
 	for (const ref of refs) {
 		try {
 			await api.editMessageText(
 				ref.chatId,
 				ref.messageId,
-				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2),
+				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 				{
-					reply_markup: createBattleKeyboard(snapshot.state, ref.playerId, {
-						type: 'default'
-					})
+					reply_markup: createBattleKeyboard(
+						snapshot.state,
+						ref.playerId,
+						{
+							type: 'default'
+						},
+						cardLookup
+					)
 				}
 			);
 		} catch {
@@ -266,46 +282,37 @@ function parseBattleCallbackData(data: string): ParsedBattleCallback {
 					attackerId: Number(parts[2]),
 					targetUnitId: Number(parts[3])
 				};
-			default:
-				return { command: 'refresh' };
 		}
 	}
 
-	return parseLegacyBattleCallbackData(parts);
-}
+	if (parts[0] === 'battle') {
+		const battleId = parts[1] ? Number(parts[1]) : undefined;
+		switch (parts[2]) {
+			case 'refresh':
+				return { battleId, command: 'refresh' };
+			case 'back':
+				return { battleId, command: 'back' };
+			case 'hand':
+				return { battleId, command: 'hand' };
+			case 'attack':
+				return { battleId, command: 'attack' };
+			case 'end':
+				return { battleId, command: 'end' };
+			case 'attacker':
+				return { battleId, command: 'attacker', attackerId: Number(parts[3]) };
+			case 'play':
+				return { battleId, command: 'play', cardInstanceId: Number(parts[3]) };
+			case 'target_hero':
+				return { battleId, command: 'target_hero', attackerId: Number(parts[3]) };
+			case 'target_unit':
+				return {
+					battleId,
+					command: 'target_unit',
+					attackerId: Number(parts[3]),
+					targetUnitId: Number(parts[4])
+				};
+		}
+	}
 
-function parseLegacyBattleCallbackData(parts: string[]): ParsedBattleCallback {
-	const battleId = Number(parts[1]);
-	const command = parts[2];
-
-	if (command === 'refresh') {
-		return { battleId, command: 'refresh' };
-	}
-	if (command === 'back') {
-		return { battleId, command: 'back' };
-	}
-	if (command === 'hand') {
-		return { battleId, command: 'hand' };
-	}
-	if (command === 'attack') {
-		return { battleId, command: 'attack' };
-	}
-	if (command === 'end') {
-		return { battleId, command: 'end' };
-	}
-	if (command === 'attacker') {
-		return { battleId, command: 'attacker', attackerId: Number(parts[3]) };
-	}
-	if (command === 'play') {
-		return { battleId, command: 'play', cardInstanceId: Number(parts[3]) };
-	}
-	if (command === 'target' && parts[3] === 'hero') {
-		return { battleId, command: 'target_hero', attackerId: Number(parts[4]) };
-	}
-	return {
-		battleId,
-		command: 'target_unit',
-		attackerId: Number(parts[4]),
-		targetUnitId: Number(parts[5])
-	};
+	throw new Error(`Unknown battle callback: ${data}`);
 }
