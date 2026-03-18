@@ -1,6 +1,5 @@
 import type { Battle, Player } from '@prisma/client';
 import type { Redis } from 'ioredis';
-import { STARTER_CARD_MAP } from '../../../cards/starterCards.js';
 import { applyAction, createInitialBattleState } from '../../core/engine/gameEngine.js';
 import type { BattleState } from '../../core/types/BattleState.js';
 import type { GameAction } from '../../core/types/GameAction.js';
@@ -8,6 +7,7 @@ import { BattleRepository } from '../../infra/prisma/repositories/battleReposito
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
 import { RedisLockService } from '../../infra/redis/locks.js';
+import { CardService } from './cardService.js';
 
 export interface BattleSnapshot {
 	battle: Battle;
@@ -42,6 +42,7 @@ export class BattleService {
 		private readonly battleRepository: BattleRepository,
 		private readonly playerRepository: PlayerRepository,
 		private readonly deckRepository: DeckRepository,
+		private readonly cardService: CardService,
 		private readonly redis: Redis,
 		private readonly lockService: RedisLockService
 	) {}
@@ -53,6 +54,10 @@ export class BattleService {
 			throw new Error('Both players must have a deck.');
 		}
 
+		const cardLookup = await this.cardService.getLookupByIds([
+			...(deck1.cardsJson as string[]),
+			...(deck2.cardsJson as string[])
+		]);
 		const startingPlayerId = player1.id;
 		const battle = await this.battleRepository.create({
 			player1Id: player1.id,
@@ -67,7 +72,7 @@ export class BattleService {
 			player1Deck: shuffleDeck(deck1.cardsJson as string[]),
 			player2Deck: shuffleDeck(deck2.cardsJson as string[]),
 			startingPlayerId,
-			cardLookup: mustCard
+			cardLookup
 		});
 
 		const persistedBattle = await this.battleRepository.saveState(battle.id, state);
@@ -141,13 +146,14 @@ export class BattleService {
 				throw new Error('Player is not part of this battle.');
 			}
 
+			const cardLookup = await this.cardService.getLookupForBattleState(snapshot.state);
 			const result = applyAction(
 				snapshot.state,
 				{
 					...params.action,
 					playerId: actor.id
 				} as GameAction,
-				mustCard
+				cardLookup
 			);
 			if (!result.ok) {
 				throw new Error(result.error ?? 'Action failed.');
@@ -243,14 +249,6 @@ export class BattleService {
 	private battleLockKey(battleId: number): string {
 		return `dino:battle:${battleId}:lock`;
 	}
-}
-
-function mustCard(cardId: string) {
-	const card = STARTER_CARD_MAP.get(cardId);
-	if (!card) {
-		throw new Error(`Unknown card: ${cardId}`);
-	}
-	return card;
 }
 
 function shuffleDeck(deck: string[]): string[] {

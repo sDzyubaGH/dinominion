@@ -1,3 +1,19 @@
+export type CardAbility =
+	| {
+			type: 'guard';
+	  }
+	| {
+			type: 'pack';
+			attackBonus: number;
+			minAllies: number;
+			sameSpecies: boolean;
+	  }
+	| {
+			type: 'hatch';
+			into: string;
+			afterOwnerTurns: number;
+	  };
+
 export interface CardDefinition {
 	id: string;
 	name: string;
@@ -6,11 +22,7 @@ export interface CardDefinition {
 	health: number;
 	species: string;
 	abilityText?: string;
-	keywords?: Array<'guard'>;
-	egg?: {
-		hatchesIntoCardId: string;
-		turnsToHatch: number;
-	};
+	abilities?: CardAbility[];
 }
 
 export interface HandCard {
@@ -18,14 +30,18 @@ export interface HandCard {
 	cardId: string;
 }
 
+export type UnitEffectState =
+	| {
+			type: 'hatch';
+			into: string;
+			turnsRemaining: number;
+	  };
+
 export interface UnitState {
 	instanceId: number;
 	cardId: string;
 	ownerId: number;
 	damageTaken: number;
 	canAttack: boolean;
-	eggState?: {
-		hatchesIntoCardId: string;
-		turnsRemaining: number;
-	};
+	effects?: UnitEffectState[];
 }

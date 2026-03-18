@@ -1,7 +1,7 @@
 import type { CardDefinition } from '../entities/Card.js';
 import type { BattleState } from '../types/BattleState.js';
 import type { GameAction } from '../types/GameAction.js';
-import { MAX_BOARD_SIZE, getOpponent, hasGuardOnBoard } from './rules.js';
+import { MAX_BOARD_SIZE, getOpponent, hasAbility, hasGuardOnBoard } from './rules.js';
 
 export function validateAction(
 	state: BattleState,
@@ -46,9 +46,7 @@ export function validateAction(
 		}
 
 		const opponent = getOpponent(state, action.playerId);
-		const guards = opponent.board.filter((unit) =>
-			cardLookup(unit.cardId).keywords?.includes('guard')
-		);
+		const guards = opponent.board.filter((unit) => hasAbility(cardLookup(unit.cardId), 'guard'));
 
 		if (action.target.type === 'hero' && guards.length > 0) {
 			return 'Сначала нужно атаковать существ с охраной.';

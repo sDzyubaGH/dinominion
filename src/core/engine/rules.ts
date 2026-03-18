@@ -1,4 +1,4 @@
-import type { CardDefinition, UnitState } from '../entities/Card.js';
+import type { CardAbility, CardDefinition, UnitState } from '../entities/Card.js';
 import type { BattleParticipantState, BattleState } from '../types/BattleState.js';
 
 export const STARTING_HEALTH = 20;
@@ -17,11 +17,15 @@ export function getUnitCurrentHealth(card: CardDefinition, unit: UnitState): num
 	return card.health - unit.damageTaken;
 }
 
+export function hasAbility(card: CardDefinition, type: CardAbility['type']): boolean {
+	return card.abilities?.some((ability) => ability.type === type) ?? false;
+}
+
 export function hasGuardOnBoard(
 	board: UnitState[],
 	cardLookup: (cardId: string) => CardDefinition
 ): boolean {
-	return board.some((unit) => cardLookup(unit.cardId).keywords?.includes('guard'));
+	return board.some((unit) => hasAbility(cardLookup(unit.cardId), 'guard'));
 }
 
 export function getUnitAttack(
@@ -32,11 +36,22 @@ export function getUnitAttack(
 	const card = cardLookup(unit.cardId);
 	let attack = card.attack;
 
-	const alliesWithSameSpecies = owner.board.filter(
-		(ally) => cardLookup(ally.cardId).species === card.species
-	);
-	if (alliesWithSameSpecies.length >= 2) {
-		attack += 1;
+	for (const ability of card.abilities ?? []) {
+		if (ability.type !== 'pack') {
+			continue;
+		}
+
+		const alliesMatchingSpecies = owner.board.filter((ally) => {
+			if (ally.instanceId === unit.instanceId) {
+				return false;
+			}
+
+			const allyCard = cardLookup(ally.cardId);
+			return ability.sameSpecies ? allyCard.species === card.species : true;
+		});
+		if (alliesMatchingSpecies.length >= ability.minAllies) {
+			attack += ability.attackBonus;
+		}
 	}
 
 	return attack;

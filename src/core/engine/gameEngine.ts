@@ -1,4 +1,4 @@
-import type { CardDefinition, HandCard, UnitState } from '../entities/Card.js';
+import type { CardDefinition, HandCard, UnitEffectState, UnitState } from '../entities/Card.js';
 import type { BattleParticipantState, BattleState } from '../types/BattleState.js';
 import type { GameAction } from '../types/GameAction.js';
 import {
@@ -6,7 +6,8 @@ import {
 	STARTING_HEALTH,
 	getOpponent,
 	getUnitAttack,
-	getUnitCurrentHealth
+	getUnitCurrentHealth,
+	hasAbility
 } from './rules.js';
 import { validateAction } from './validators.js';
 
@@ -120,9 +121,7 @@ export function getAvailableActions(
 		.map((card) => card.instanceId);
 
 	const opponent = getOpponent(state, playerId);
-	const guards = opponent.board.filter((unit) =>
-		cardLookup(unit.cardId).keywords?.includes('guard')
-	);
+	const guards = opponent.board.filter((unit) => hasAbility(cardLookup(unit.cardId), 'guard'));
 	const attackers = player.board.filter((unit) => unit.canAttack).map((unit) => unit.instanceId);
 	const targetsByAttacker: Record<
 		number,
@@ -170,49 +169,48 @@ function startTurn(
 	drawCards(state, playerId, 1);
 
 	for (const unit of player.board) {
-		if (unit.eggState) {
+		if (hasEffect(unit, 'hatch')) {
 			continue;
 		}
 		unit.canAttack = true;
 	}
 
-	resolveEggs(state, playerId, cardLookup);
+	resolveTurnEffects(state, playerId, cardLookup);
 }
 
-function resolveEggs(
+function resolveTurnEffects(
 	state: BattleState,
 	playerId: number,
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
 	player.board = player.board.map((unit) => {
-		if (!unit.eggState) {
+		const hatchEffect = unit.effects?.find((effect) => effect.type === 'hatch');
+		if (!hatchEffect) {
 			return unit;
 		}
 
-		if (unit.eggState.turnsRemaining > 0) {
-			const turnsRemaining = unit.eggState.turnsRemaining - 1;
-			if (turnsRemaining > 0) {
-				return {
-					...unit,
-					eggState: {
-						...unit.eggState,
-						turnsRemaining
-					}
-				};
-			}
+		const turnsRemaining = hatchEffect.turnsRemaining - 1;
+		if (turnsRemaining > 0) {
+			return {
+				...unit,
+				effects: updateEffect(unit.effects ?? [], {
+					...hatchEffect,
+					turnsRemaining
+				})
+			};
 		}
 
-		const hatchedCardId = unit.eggState.hatchesIntoCardId;
-		const hatchedDefinition = cardLookup(hatchedCardId);
+		const hatchedDefinition = cardLookup(hatchEffect.into);
 		state.log.unshift(`${unit.instanceId} вылупляется в ${hatchedDefinition.name}.`);
 
 		return {
 			instanceId: unit.instanceId,
-			cardId: hatchedCardId,
+			cardId: hatchEffect.into,
 			ownerId: unit.ownerId,
 			damageTaken: 0,
-			canAttack: false
+			canAttack: false,
+			effects: createInitialEffects(hatchedDefinition)
 		};
 	});
 }
@@ -326,13 +324,38 @@ function toUnit(card: HandCard, ownerId: number, definition: CardDefinition): Un
 		ownerId,
 		damageTaken: 0,
 		canAttack: false,
-		eggState: definition.egg
-			? {
-					hatchesIntoCardId: definition.egg.hatchesIntoCardId,
-					turnsRemaining: definition.egg.turnsToHatch
-				}
-			: undefined
+		effects: createInitialEffects(definition)
 	};
+}
+
+function createInitialEffects(definition: CardDefinition): UnitEffectState[] | undefined {
+	const effects: UnitEffectState[] = [];
+
+	for (const ability of definition.abilities ?? []) {
+		if (ability.type === 'hatch') {
+			effects.push({
+				type: 'hatch',
+				into: ability.into,
+				turnsRemaining: ability.afterOwnerTurns
+			});
+		}
+	}
+
+	return effects.length > 0 ? effects : undefined;
+}
+
+function hasEffect(unit: UnitState, type: UnitEffectState['type']): boolean {
+	return unit.effects?.some((effect) => effect.type === type) ?? false;
+}
+
+function updateEffect(
+	effects: UnitEffectState[],
+	nextEffect: UnitEffectState
+): UnitEffectState[] | undefined {
+	const nextEffects = effects.map((effect) =>
+		effect.type === nextEffect.type ? nextEffect : effect
+	);
+	return nextEffects.length > 0 ? nextEffects : undefined;
 }
 
 function cloneState(state: BattleState): BattleState {

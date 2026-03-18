@@ -34,6 +34,21 @@ model Deck {
 	player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
+model Card {
+	id          Int      @id @default(autoincrement())
+	slug        String   @unique
+	name        String
+	cost        Int
+	attack      Int
+	health      Int
+	species     String
+	abilityText String?
+	abilities   Json
+	isActive    Boolean  @default(true)
+	createdAt   DateTime @default(now())
+	updatedAt   DateTime @updatedAt
+}
+
 model Battle {
 	id                  Int          @id @default(autoincrement())
 	player1Id           Int
