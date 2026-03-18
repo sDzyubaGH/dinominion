@@ -1,7 +1,7 @@
 import { InlineKeyboard } from 'grammy';
-import type { CardDefinition } from '../../domain/entities/Card.js';
-import { getAvailableActions } from '../../domain/engine/gameEngine.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
+import { getAvailableActions } from '../../core/engine/gameEngine.js';
+import type { CardDefinition } from '../../core/entities/Card.js';
+import type { BattleState } from '../../core/types/BattleState.js';
 
 export type BattleViewMode =
 	| {
@@ -32,12 +32,10 @@ export function createBattleKeyboard(
 		if (isCurrentPlayer) {
 			for (const card of player?.hand ?? []) {
 				const definition = cardLookup(card.cardId);
-				keyboard
-					.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`)
-					.row();
+				keyboard.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`).row();
 			}
 		}
-		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:b');
 	}
 
 	if (mode.type === 'attackers') {
@@ -53,12 +51,12 @@ export function createBattleKeyboard(
 				keyboard.text(cardLookup(unit.cardId).name, `b:aa:${attackerId}`).row();
 			}
 		}
-		return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:b');
 	}
 
 	if (mode.type === 'targets') {
 		if (!isCurrentPlayer) {
-			return keyboard.text('Назад', 'b:b')/*.text('Обновить бой', 'b:r')*/;
+			return keyboard.text('Назад', 'b:b');
 		}
 
 		const actions = getAvailableActions(state, viewerId, cardLookup);
@@ -83,7 +81,7 @@ export function createBattleKeyboard(
 				.row();
 		}
 
-		return keyboard.text('Назад', 'b:a')/*.text('Обновить бой', 'b:r')*/;
+		return keyboard.text('Назад', 'b:a');
 	}
 
 	keyboard.text('Посмотреть руку', 'b:h').row();
@@ -91,7 +89,6 @@ export function createBattleKeyboard(
 		keyboard.text('Атаковать', 'b:a').row();
 		keyboard.text('Завершить ход', 'b:e').row();
 	}
-	// keyboard.text('Обновить бой', 'b:r');
 
 	return keyboard;
 }

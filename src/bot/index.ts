@@ -46,8 +46,8 @@ const matchmakingService = new MatchmakingService(
 registerStartHandler(bot, playerService);
 registerProfileHandler(bot, playerService);
 registerDeckHandler(bot, playerService, deckService);
-registerPlayHandler(bot, playerService, matchmakingService, battleService);
-registerBattleHandler(bot, playerService, battleService);
+registerPlayHandler(bot, playerService, cardCatalogService, matchmakingService, battleService);
+registerBattleHandler(bot, playerService, cardCatalogService, battleService);
 
 bot.catch((error) => {
 	console.error('Bot error', error.error);

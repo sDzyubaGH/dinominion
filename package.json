@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "tsx src/bot/index.ts",
 		"build": "tsc -p tsconfig.json",
-		"start": "node src/bot/index.js",
+		"start": "node dist/src/bot/index.js",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier --write .",

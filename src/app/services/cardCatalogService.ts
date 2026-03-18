@@ -1,5 +1,7 @@
 import type { JsonValue } from '@prisma/client/runtime/library';
-import type { CardDefinition } from '../../domain/entities/Card.js';
+import { collectBattleCardIds, createCardLookup } from '../../core/cardCatalog.js';
+import type { CardAbility, CardDefinition } from '../../core/entities/Card.js';
+import type { BattleState } from '../../core/types/BattleState.js';
 import {
 	CardRepository,
 	type CardWithEffects
@@ -26,13 +28,26 @@ export class CardCatalogService {
 
 	async getLookup(options?: { activeOnly?: boolean }): Promise<CardLookup> {
 		const map = await this.getCardMap(options?.activeOnly ?? false);
-		return (cardId: string) => {
-			const card = map.get(cardId);
-			if (!card) {
-				throw new Error(`Unknown card: ${cardId}`);
-			}
-			return card;
-		};
+		return createCardLookup([...map.values()]);
+	}
+
+	async getLookupByIds(cardIds: string[]): Promise<CardLookup> {
+		const uniqueIds = [...new Set(cardIds)];
+		if (uniqueIds.length === 0) {
+			return createCardLookup([]);
+		}
+
+		const cards = this.buildMap(await this.cardRepository.findManyBySlugsWithEffects(uniqueIds));
+		const missingCardId = uniqueIds.find((cardId) => !cards.has(cardId));
+		if (missingCardId) {
+			throw new Error(`Unknown card: ${missingCardId}`);
+		}
+
+		return createCardLookup([...cards.values()]);
+	}
+
+	async getLookupForBattleState(state: BattleState): Promise<CardLookup> {
+		return this.getLookupByIds(collectBattleCardIds(state));
 	}
 
 	async getCardName(cardId: string): Promise<string> {
@@ -56,10 +71,8 @@ export class CardCatalogService {
 			throw new Error('Нет карт в базе данных.');
 		}
 
-		const result = built;
-
 		const updatedCache = {
-			map: result,
+			map: built,
 			loadedAt: now
 		};
 		if (activeOnly) {
@@ -67,23 +80,14 @@ export class CardCatalogService {
 		} else {
 			this.allCardsCache = updatedCache;
 		}
-		return result;
+		return built;
 	}
 
 	private buildMap(cards: CardWithEffects[]): Map<string, CardDefinition> {
 		return new Map(
-			cards.map((card) => {
-				const keywords = card.effects.some((effect) => effect.effectType === 'GUARD_PASSIVE')
-					? (['guard'] as Array<'guard'>)
-					: undefined;
-				const hatchEffect = card.effects.find((effect) => effect.effectType === 'HATCH');
-				const hatchParams = getObject(hatchEffect?.params ?? null);
-				const hatchInto =
-					readString(hatchParams, 'intoSlug') ?? readString(hatchParams, 'hatchesIntoCardId');
-				const turnsToHatch =
-					readNumber(hatchParams, 'turns') ?? readNumber(hatchParams, 'turnsToHatch');
-
-				const definition: CardDefinition = {
+			cards.map((card) => [
+				card.slug,
+				{
 					id: card.slug,
 					name: card.name,
 					cost: card.cost,
@@ -91,20 +95,52 @@ export class CardCatalogService {
 					health: card.health ?? 0,
 					species: card.species ?? 'Neutral',
 					abilityText: card.abilityText ?? undefined,
-					keywords,
-					egg:
-						hatchInto && turnsToHatch !== undefined
-							? {
-									hatchesIntoCardId: hatchInto,
-									turnsToHatch
-								}
-							: undefined
-				};
-
-				return [definition.id, definition];
-			})
+					abilities: toAbilities(card)
+				} satisfies CardDefinition
+			])
 		);
 	}
+}
+
+function toAbilities(card: CardWithEffects): CardAbility[] | undefined {
+	const abilities: CardAbility[] = [];
+
+	for (const effect of card.effects) {
+		if (effect.effectType === 'GUARD_PASSIVE') {
+			abilities.push({ type: 'guard' });
+			continue;
+		}
+
+		if (effect.effectType === 'PACK_ATTACK') {
+			const params = getObject(effect.params);
+			abilities.push({
+				type: 'pack',
+				attackBonus: effect.value ?? readNumber(params, 'attackBonus') ?? 1,
+				minAllies: readNumber(params, 'minAllies') ?? 1,
+				sameSpecies: readBoolean(params, 'sameSpecies') ?? true
+			});
+			continue;
+		}
+
+		if (effect.effectType === 'HATCH') {
+			const params = getObject(effect.params);
+			const into = readString(params, 'intoSlug') ?? readString(params, 'hatchesIntoCardId');
+			const afterOwnerTurns =
+				effect.durationEffect ??
+				readNumber(params, 'turns') ??
+				readNumber(params, 'turnsToHatch');
+			if (!into || afterOwnerTurns === undefined) {
+				continue;
+			}
+			abilities.push({
+				type: 'hatch',
+				into,
+				afterOwnerTurns
+			});
+		}
+	}
+
+	return abilities.length > 0 ? abilities : undefined;
 }
 
 function getObject(value: JsonValue | null): Record<string, JsonValue> | null {
@@ -122,4 +158,9 @@ function readString(object: Record<string, JsonValue> | null, key: string): stri
 function readNumber(object: Record<string, JsonValue> | null, key: string): number | undefined {
 	const value = object?.[key];
 	return typeof value === 'number' ? value : undefined;
+}
+
+function readBoolean(object: Record<string, JsonValue> | null, key: string): boolean | undefined {
+	const value = object?.[key];
+	return typeof value === 'boolean' ? value : undefined;
 }

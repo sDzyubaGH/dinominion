@@ -19,6 +19,7 @@ enum CardType {
 
 enum EffectType {
 	GUARD_PASSIVE
+	PACK_ATTACK
 	HATCH
 	EVOLVE
 	BUFF_ATTACK
@@ -62,6 +63,24 @@ model Deck {
 	player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
 }
 
+model Card {
+	id          Int          @id @default(autoincrement())
+	slug        String       @unique
+	name        String
+	type        CardType
+	cost        Int
+	attack      Int?
+	health      Int?
+	species     String?
+	abilityText String?
+	isActive    Boolean      @default(true)
+	createdAt   DateTime     @default(now())
+	updatedAt   DateTime     @updatedAt
+	effects     CardEffect[]
+
+	@@index([type, isActive])
+}
+
 model Battle {
 	id                  Int          @id @default(autoincrement())
 	player1Id           Int
@@ -82,36 +101,17 @@ model Battle {
 }
 
 model CardEffect {
-	id Int @id @default(autoincrement())
-	cardId Int 
-	effectType EffectType
-	triggerType TriggerType
-	targetType TargetType
-	value Int?
+	id             Int         @id @default(autoincrement())
+	cardId         Int
+	effectType     EffectType
+	triggerType    TriggerType
+	targetType     TargetType
+	value          Int?
 	durationEffect Int?
-	params Json?
-	sortOrder Int @default(0)
-	card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+	params         Json?
+	sortOrder      Int         @default(0)
+	card           Card        @relation(fields: [cardId], references: [id], onDelete: Cascade)
 
 	@@index([cardId, triggerType])
 	@@index([effectType])
-
-}
-
-model Card {
-	id Int @id @default(autoincrement())
-	slug String @unique
-	name String
-	type CardType
-	cost Int
-	attack Int?
-	health Int?
-	species String?
-	abilityText String?
-	isActive Boolean @default(true)
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
-	effects CardEffect[] 
-
-	@@index([type, isActive])
 }

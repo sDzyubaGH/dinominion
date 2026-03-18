@@ -1,9 +1,8 @@
 import type { Battle, Player } from '@prisma/client';
 import type { Redis } from 'ioredis';
-import type { CardDefinition } from '../../domain/entities/Card.js';
-import { applyAction, createInitialBattleState } from '../../domain/engine/gameEngine.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
-import type { GameAction } from '../../domain/types/GameAction.js';
+import { applyAction, createInitialBattleState } from '../../core/engine/gameEngine.js';
+import type { BattleState } from '../../core/types/BattleState.js';
+import type { GameAction } from '../../core/types/GameAction.js';
 import { BattleRepository } from '../../infra/prisma/repositories/battleRepository.js';
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
@@ -49,13 +48,16 @@ export class BattleService {
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
-		const cardLookup = await this.cardCatalogService.getLookup();
 		const deck1 = await this.deckRepository.findByPlayerId(player1.id);
 		const deck2 = await this.deckRepository.findByPlayerId(player2.id);
 		if (!deck1 || !deck2) {
 			throw new Error('Both players must have a deck.');
 		}
 
+		const cardLookup = await this.cardCatalogService.getLookupByIds([
+			...(deck1.cardsJson as string[]),
+			...(deck2.cardsJson as string[])
+		]);
 		const startingPlayerId = player1.id;
 		const battle = await this.battleRepository.create({
 			player1Id: player1.id,
@@ -144,13 +146,14 @@ export class BattleService {
 				throw new Error('Player is not part of this battle.');
 			}
 
+			const cardLookup = await this.cardCatalogService.getLookupForBattleState(snapshot.state);
 			const result = applyAction(
 				snapshot.state,
 				{
 					...params.action,
 					playerId: actor.id
 				} as GameAction,
-				await this.cardCatalogService.getLookup()
+				cardLookup
 			);
 			if (!result.ok) {
 				throw new Error(result.error ?? 'Action failed.');
@@ -204,14 +207,6 @@ export class BattleService {
 				messageId: Number(messageId)
 			};
 		});
-	}
-
-	async getCardLookup(): Promise<(cardId: string) => CardDefinition> {
-		return this.cardCatalogService.getLookup();
-	}
-
-	async getCardName(cardId: string): Promise<string> {
-		return this.cardCatalogService.getCardName(cardId);
 	}
 
 	private async findAndCacheActiveBattle(playerId: number): Promise<number | null> {

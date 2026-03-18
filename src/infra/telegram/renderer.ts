@@ -1,8 +1,8 @@
 import type { Player } from '@prisma/client';
-import type { CardDefinition } from '../../domain/entities/Card.js';
-import { getAvailableActions } from '../../domain/engine/gameEngine.js';
-import { getUnitAttack, getUnitCurrentHealth } from '../../domain/engine/rules.js';
-import type { BattleState } from '../../domain/types/BattleState.js';
+import { getAvailableActions } from '../../core/engine/gameEngine.js';
+import { getUnitAttack, getUnitCurrentHealth, hasAbility } from '../../core/engine/rules.js';
+import type { CardDefinition } from '../../core/entities/Card.js';
+import type { BattleState } from '../../core/types/BattleState.js';
 
 function displayName(player: Player): string {
 	return player.username ? `@${player.username}` : `tg:${player.telegramId.toString()}`;
@@ -84,13 +84,14 @@ function renderParticipant(
 			: participant.board
 					.map((unit, index) => {
 						const definition = cardLookup(unit.cardId);
-						if (unit.eggState) {
-							return `${index + 1}. ${definition.name} (вылупится через ${unit.eggState.turnsRemaining})`;
+						const hatchEffect = unit.effects?.find((effect) => effect.type === 'hatch');
+						if (hatchEffect) {
+							return `${index + 1}. ${definition.name} (вылупится через ${hatchEffect.turnsRemaining})`;
 						}
 
 						const attack = getUnitAttack(participant, unit, cardLookup);
 						const health = getUnitCurrentHealth(definition, unit);
-						const guard = definition.keywords?.includes('guard') ? ' [Охрана]' : '';
+						const guard = hasAbility(definition, 'guard') ? ' [Охрана]' : '';
 						return `${index + 1}. ${definition.name} ${attack}/${health}${guard}`;
 					})
 					.join('\n'),

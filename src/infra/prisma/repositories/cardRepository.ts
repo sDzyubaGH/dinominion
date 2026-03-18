@@ -7,7 +7,11 @@ export class CardRepository {
 	async findAllWithEffects(): Promise<CardWithEffects[]> {
 		return prisma.card.findMany({
 			include: {
-				effects: true
+				effects: {
+					orderBy: {
+						sortOrder: 'asc'
+					}
+				}
 			}
 		});
 	}
@@ -18,7 +22,28 @@ export class CardRepository {
 				isActive: true
 			},
 			include: {
-				effects: true
+				effects: {
+					orderBy: {
+						sortOrder: 'asc'
+					}
+				}
+			}
+		});
+	}
+
+	async findManyBySlugsWithEffects(cardSlugs: string[]): Promise<CardWithEffects[]> {
+		return prisma.card.findMany({
+			where: {
+				slug: {
+					in: cardSlugs
+				}
+			},
+			include: {
+				effects: {
+					orderBy: {
+						sortOrder: 'asc'
+					}
+				}
 			}
 		});
 	}

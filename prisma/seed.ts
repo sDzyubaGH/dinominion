@@ -36,28 +36,47 @@ async function main(): Promise<void> {
 
 		const effects: Prisma.CardEffectCreateManyInput[] = [];
 
-		if (card.keywords?.includes('guard')) {
-			effects.push({
-				cardId: persistedCard.id,
-				effectType: 'GUARD_PASSIVE',
-				triggerType: 'PASSIVE',
-				targetType: 'NONE',
-				sortOrder: 0
-			});
-		}
+		for (const ability of card.abilities ?? []) {
+			if (ability.type === 'guard') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'GUARD_PASSIVE',
+					triggerType: 'PASSIVE',
+					targetType: 'NONE',
+					sortOrder: effects.length
+				});
+				continue;
+			}
 
-		if (card.egg) {
-			effects.push({
-				cardId: persistedCard.id,
-				effectType: 'HATCH',
-				triggerType: 'TURN_START_OWNER',
-				targetType: 'SELF',
-				sortOrder: 0,
-				params: {
-					hatchesIntoCardId: card.egg.hatchesIntoCardId,
-					turnsToHatch: card.egg.turnsToHatch
-				}
-			});
+			if (ability.type === 'pack') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'PACK_ATTACK',
+					triggerType: 'PASSIVE',
+					targetType: 'SELF',
+					value: ability.attackBonus,
+					sortOrder: effects.length,
+					params: {
+						minAllies: ability.minAllies,
+						sameSpecies: ability.sameSpecies
+					}
+				});
+				continue;
+			}
+
+			if (ability.type === 'hatch') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'HATCH',
+					triggerType: 'TURN_START_OWNER',
+					targetType: 'SELF',
+					durationEffect: ability.afterOwnerTurns,
+					sortOrder: effects.length,
+					params: {
+						intoSlug: ability.into
+					}
+				});
+			}
 		}
 
 		if (effects.length > 0) {
