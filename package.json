@@ -12,17 +12,22 @@
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"prisma:generate": "prisma generate",
-		"prisma:migrate": "prisma migrate dev"
+		"prisma:migrate": "prisma migrate dev",
+		"prisma:seed": "tsx prisma/seed.ts"
+	},
+	"prisma": {
+		"seed": "tsx prisma/seed.ts"
 	},
 	"dependencies": {
 		"@prisma/client": "^6.16.2",
 		"dotenv": "^17.3.1",
-		"grammy": "^1.38.3",
-		"ioredis": "^5.7.0"
+		"grammy": "^1.41.1",
+		"ioredis": "^5.7.0",
+		"nodemon": "^3.1.14"
 	},
 	"devDependencies": {
-		"@types/node": "^24.0.0",
 		"@eslint/js": "^9.34.0",
+		"@types/node": "^24.0.0",
 		"eslint": "^9.34.0",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^16.3.0",

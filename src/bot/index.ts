@@ -1,7 +1,7 @@
 import { Bot } from 'grammy';
 import { env } from '../config/env.js';
 import { BattleService } from '../app/services/battleService.js';
-import { CardService } from '../app/services/cardService.js';
+import { CardCatalogService } from '../app/services/cardCatalogService.js';
 import { DeckService } from '../app/services/deckService.js';
 import { MatchmakingService } from '../app/services/matchmakingService.js';
 import { PlayerService } from '../app/services/playerService.js';
@@ -24,19 +24,17 @@ const playerRepository = new PlayerRepository();
 const deckRepository = new DeckRepository();
 const battleRepository = new BattleRepository();
 const cardRepository = new CardRepository();
-const cardService = new CardService(cardRepository);
-await cardService.ensureSeedCards();
-
-const deckService = new DeckService(deckRepository, cardService);
+const cardCatalogService = new CardCatalogService(cardRepository);
+const deckService = new DeckService(deckRepository, cardCatalogService);
 const playerService = new PlayerService(playerRepository, deckService);
 const lockService = new RedisLockService(redis);
 const battleService = new BattleService(
 	battleRepository,
 	playerRepository,
 	deckRepository,
-	cardService,
 	redis,
-	lockService
+	lockService,
+	cardCatalogService
 );
 const matchmakingQueue = new MatchmakingQueue(redis, lockService);
 const matchmakingService = new MatchmakingService(
@@ -48,8 +46,8 @@ const matchmakingService = new MatchmakingService(
 registerStartHandler(bot, playerService);
 registerProfileHandler(bot, playerService);
 registerDeckHandler(bot, playerService, deckService);
-registerPlayHandler(bot, playerService, cardService, matchmakingService, battleService);
-registerBattleHandler(bot, playerService, cardService, battleService);
+registerPlayHandler(bot, playerService, cardCatalogService, matchmakingService, battleService);
+registerBattleHandler(bot, playerService, cardCatalogService, battleService);
 
 bot.catch((error) => {
 	console.error('Bot error', error.error);

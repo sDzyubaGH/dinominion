@@ -7,7 +7,7 @@ import { BattleRepository } from '../../infra/prisma/repositories/battleReposito
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
 import { RedisLockService } from '../../infra/redis/locks.js';
-import { CardService } from './cardService.js';
+import { CardCatalogService } from './cardCatalogService.js';
 
 export interface BattleSnapshot {
 	battle: Battle;
@@ -42,9 +42,9 @@ export class BattleService {
 		private readonly battleRepository: BattleRepository,
 		private readonly playerRepository: PlayerRepository,
 		private readonly deckRepository: DeckRepository,
-		private readonly cardService: CardService,
 		private readonly redis: Redis,
-		private readonly lockService: RedisLockService
+		private readonly lockService: RedisLockService,
+		private readonly cardCatalogService: CardCatalogService
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
@@ -54,7 +54,7 @@ export class BattleService {
 			throw new Error('Both players must have a deck.');
 		}
 
-		const cardLookup = await this.cardService.getLookupByIds([
+		const cardLookup = await this.cardCatalogService.getLookupByIds([
 			...(deck1.cardsJson as string[]),
 			...(deck2.cardsJson as string[])
 		]);
@@ -146,7 +146,7 @@ export class BattleService {
 				throw new Error('Player is not part of this battle.');
 			}
 
-			const cardLookup = await this.cardService.getLookupForBattleState(snapshot.state);
+			const cardLookup = await this.cardCatalogService.getLookupForBattleState(snapshot.state);
 			const result = applyAction(
 				snapshot.state,
 				{

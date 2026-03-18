@@ -60,9 +60,15 @@ npm run prisma:generate
 npm run prisma:migrate -- --name init
 ```
 
-4. Start PostgreSQL and Redis.
+4. Seed cards into `Card` and `CardEffect` tables:
 
-5. Start the bot:
+```bash
+npm run prisma:seed
+```
+
+5. Start PostgreSQL and Redis.
+
+6. Start the bot:
 
 ```bash
 npm run dev
@@ -77,6 +83,7 @@ npm run dev
 - `npm run format`
 - `npm run prisma:generate`
 - `npm run prisma:migrate`
+- `npm run prisma:seed`
 
 ## Battle Flow
 

@@ -1,6 +1,6 @@
 import type { Bot, Context } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
-import type { CardService } from '../../app/services/cardService.js';
+import type { CardCatalogService } from '../../app/services/cardCatalogService.js';
 import type { MatchmakingService } from '../../app/services/matchmakingService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
 import { createBattleKeyboard } from '../keyboards/battleKeyboard.js';
@@ -9,7 +9,7 @@ import { renderBattleText } from '../../infra/telegram/renderer.js';
 export function registerPlayHandler(
 	bot: Bot<Context>,
 	playerService: PlayerService,
-	cardService: CardService,
+	cardCatalogService: CardCatalogService,
 	matchmakingService: MatchmakingService,
 	battleService: BattleService
 ): void {
@@ -37,7 +37,7 @@ export function registerPlayHandler(
 			throw new Error('Created battle could not be loaded.');
 		}
 
-		const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
+		const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
 		for (const targetPlayer of [snapshot.player1, snapshot.player2]) {
 			const sentMessage = await bot.api.sendMessage(
 				Number(targetPlayer.telegramId),

@@ -1,7 +1,6 @@
-import type { Bot, Context } from 'grammy';
-import type { Api } from 'grammy';
+import type { Api, Bot, Context } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
-import type { CardService } from '../../app/services/cardService.js';
+import type { CardCatalogService } from '../../app/services/cardCatalogService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
 import { createBattleKeyboard, type BattleViewMode } from '../keyboards/battleKeyboard.js';
 import {
@@ -13,7 +12,7 @@ import {
 export function registerBattleHandler(
 	bot: Bot<Context>,
 	playerService: PlayerService,
-	cardService: CardService,
+	cardCatalogService: CardCatalogService,
 	battleService: BattleService
 ): void {
 	bot.command('battle', async (ctx) => {
@@ -28,7 +27,7 @@ export function registerBattleHandler(
 			return;
 		}
 
-		const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
+		const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
 		const sentMessage = await ctx.reply(
 			renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
 			{
@@ -68,7 +67,7 @@ export function registerBattleHandler(
 			return;
 		}
 
-		const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
+		const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
 
 		if (parsed.command === 'refresh' || parsed.command === 'back') {
 			await renderView(ctx, snapshot, actor.id, { type: 'default' }, cardLookup);
@@ -109,7 +108,7 @@ export function registerBattleHandler(
 						cardInstanceId: parsed.cardInstanceId
 					}
 				});
-				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Карта разыграна.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -130,7 +129,7 @@ export function registerBattleHandler(
 						target: { type: 'hero' }
 					}
 				});
-				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -151,7 +150,7 @@ export function registerBattleHandler(
 						target: { type: 'unit', unitId: parsed.targetUnitId }
 					}
 				});
-				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -170,7 +169,7 @@ export function registerBattleHandler(
 						type: 'end_turn'
 					}
 				});
-				await refreshBattleViews(bot.api, cardService, battleService, snapshot.battle.id);
+				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Ход завершен.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -189,7 +188,7 @@ async function renderView(
 	snapshot: NonNullable<Awaited<ReturnType<BattleService['getBattleSnapshotById']>>>,
 	viewerId: number,
 	mode: BattleViewMode,
-	cardLookup: Awaited<ReturnType<CardService['getLookupForBattleState']>>
+	cardLookup: Awaited<ReturnType<CardCatalogService['getLookupForBattleState']>>
 ): Promise<void> {
 	const attackerName =
 		mode.type === 'targets'
@@ -214,7 +213,7 @@ async function renderView(
 
 async function refreshBattleViews(
 	api: Api,
-	cardService: CardService,
+	cardCatalogService: CardCatalogService,
 	battleService: BattleService,
 	battleId: number
 ): Promise<void> {
@@ -223,7 +222,7 @@ async function refreshBattleViews(
 		return;
 	}
 
-	const cardLookup = await cardService.getLookupForBattleState(snapshot.state);
+	const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
 	const refs = await battleService.getBattleMessageRefs(battleId);
 	for (const ref of refs) {
 		try {
@@ -235,9 +234,7 @@ async function refreshBattleViews(
 					reply_markup: createBattleKeyboard(
 						snapshot.state,
 						ref.playerId,
-						{
-							type: 'default'
-						},
+						{ type: 'default' },
 						cardLookup
 					)
 				}
