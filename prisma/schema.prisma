@@ -47,7 +47,9 @@ model Player {
 	username         String?
 	createdAt        DateTime @default(now())
 	updatedAt        DateTime @updatedAt
-	deck             Deck?
+	currentDeckId    Int?
+	currentDeck      Deck?    @relation("PlayerCurrentDeck", fields: [currentDeckId], references: [id], onDelete: SetNull)
+	decks            Deck[]   @relation("PlayerDecks")
 	cards            PlayerCard[]
 	battlesAsPlayer1 Battle[] @relation("BattlePlayer1")
 	battlesAsPlayer2 Battle[] @relation("BattlePlayer2")
@@ -55,13 +57,16 @@ model Player {
 }
 
 model Deck {
-	id        Int        @id @default(autoincrement())
-	playerId  Int        @unique
-	name      String
-	createdAt DateTime   @default(now())
-	updatedAt DateTime   @updatedAt
-	player    Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
-	cards     DeckCard[]
+	id                Int      @id @default(autoincrement())
+	playerId          Int
+	name              String
+	createdAt         DateTime @default(now())
+	updatedAt         DateTime @updatedAt
+	player            Player   @relation("PlayerDecks", fields: [playerId], references: [id], onDelete: Cascade)
+	selectedByPlayers Player[] @relation("PlayerCurrentDeck")
+	cards             DeckCard[]
+
+	@@index([playerId])
 }
 
 model Card {

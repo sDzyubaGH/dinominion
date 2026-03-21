@@ -1,4 +1,4 @@
-import { STARTER_DECK_CARD_IDS } from '../../../cards/starterCards.js';
+import { STARTER_COLLECTION_CARD_IDS } from '../../../cards/starterCards.js';
 import { CardRepository } from '../../infra/prisma/repositories/cardRepository.js';
 import { PlayerCardRepository } from '../../infra/prisma/repositories/playerCardRepository.js';
 
@@ -9,7 +9,7 @@ export class CollectionService {
 	) {}
 
 	async ensureStarterCollection(playerId: number): Promise<void> {
-		const desiredCounts = countCardIds(STARTER_DECK_CARD_IDS);
+		const desiredCounts = countCardIds(STARTER_COLLECTION_CARD_IDS);
 		const cards = await this.cardRepository.findManyBySlugs([...desiredCounts.keys()]);
 		const cardsBySlug = new Map(cards.map((card) => [card.slug, card]));
 		const missingCardId = [...desiredCounts.keys()].find((cardId) => !cardsBySlug.has(cardId));

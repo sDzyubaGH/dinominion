@@ -48,8 +48,8 @@ export class BattleService {
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
-		const deck1 = await this.deckRepository.findByPlayerId(player1.id);
-		const deck2 = await this.deckRepository.findByPlayerId(player2.id);
+		const deck1 = await this.deckRepository.findCurrentByPlayerId(player1.id);
+		const deck2 = await this.deckRepository.findCurrentByPlayerId(player2.id);
 		if (!deck1 || !deck2) {
 			throw new Error('Both players must have a deck.');
 		}

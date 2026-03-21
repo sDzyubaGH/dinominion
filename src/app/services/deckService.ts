@@ -1,5 +1,5 @@
 import type { Deck } from '@prisma/client';
-import { STARTER_DECK_CARD_IDS } from '../../../cards/starterCards.js';
+import { STARTER_DECKS } from '../../../cards/starterCards.js';
 import type { CardDefinition } from '../../core/entities/Card.js';
 import { DeckRepository, type DeckWithCards } from '../../infra/prisma/repositories/deckRepository.js';
 import { CardCatalogService } from './cardCatalogService.js';
@@ -12,34 +12,50 @@ export class DeckService {
 		private readonly collectionService: CollectionService
 	) {}
 
-	async ensureStarterDeck(playerId: number): Promise<DeckWithCards> {
-		const existingDeck = await this.deckRepository.findByPlayerId(playerId);
-		if (existingDeck) {
-			return existingDeck;
-		}
-
+	async ensureStarterDecks(playerId: number): Promise<DeckWithCards[]> {
 		await this.collectionService.ensureStarterCollection(playerId);
-		await this.collectionService.assertHasCards(playerId, STARTER_DECK_CARD_IDS);
-		await this.deckRepository.createStarterDeck(playerId, STARTER_DECK_CARD_IDS);
+		const existingDecks = await this.deckRepository.findManyByPlayerId(playerId);
+		const existingByName = new Set(existingDecks.map((deck) => deck.name));
 
-		const createdDeck = await this.deckRepository.findByPlayerId(playerId);
-		if (!createdDeck) {
-			throw new Error('Deck could not be created.');
+		for (const deck of STARTER_DECKS) {
+			if (existingByName.has(deck.name)) {
+				continue;
+			}
+
+			await this.collectionService.assertHasCards(playerId, deck.cardIds);
+			await this.deckRepository.createDeck(playerId, deck.name, deck.cardIds);
 		}
 
-		return createdDeck;
+		const decks = await this.deckRepository.findManyByPlayerId(playerId);
+		const currentDeck = await this.deckRepository.findCurrentByPlayerId(playerId);
+		if (!currentDeck && decks[0]) {
+			await this.deckRepository.setCurrentDeck(playerId, decks[0].id);
+		}
+
+		return this.deckRepository.findManyByPlayerId(playerId);
 	}
 
 	async getDeck(playerId: number): Promise<{
-		deck: Deck;
+		deck: DeckWithCards;
 		totalCards: number;
+		decks: Array<{
+			id: number;
+			name: string;
+			isCurrent: boolean;
+		}>;
 		groupedCards: Array<{
 			cardId: string;
 			count: number;
 			definition: CardDefinition;
 		}>;
 	}> {
-		const deck = await this.ensureStarterDeck(playerId);
+		await this.ensureStarterDecks(playerId);
+		const deck = await this.deckRepository.findCurrentByPlayerId(playerId);
+		const allDecks = await this.deckRepository.findManyByPlayerId(playerId);
+		if (!deck) {
+			throw new Error('Current deck not found.');
+		}
+
 		const cardIds = deck.cards.map((card) => card.card.slug);
 		const lookup = await this.cardCatalogService.getLookup();
 		const counts = new Map<string, number>();
@@ -51,6 +67,11 @@ export class DeckService {
 		return {
 			deck,
 			totalCards: cardIds.length,
+			decks: allDecks.map((item) => ({
+				id: item.id,
+				name: item.name,
+				isCurrent: item.id === deck.id
+			})),
 			groupedCards: [...counts.entries()].map(([cardId, count]) => ({
 				cardId,
 				count,
@@ -59,19 +80,24 @@ export class DeckService {
 		};
 	}
 
-	async renameDeck(playerId: number, nextName: string): Promise<Deck> {
+	async renameDeck(playerId: number, deckId: number, nextName: string): Promise<Deck> {
 		const trimmedName = nextName.trim();
 		if (!trimmedName) {
 			throw new Error('Название колоды не может быть пустым.');
 		}
 
-		await this.ensureStarterDeck(playerId);
-		return this.deckRepository.updateName(playerId, trimmedName);
+		await this.ensureStarterDecks(playerId);
+		return this.deckRepository.updateName(deckId, playerId, trimmedName);
 	}
 
-	async updateCards(playerId: number, cardIds: string[]): Promise<Deck> {
-		await this.ensureStarterDeck(playerId);
+	async switchCurrentDeck(playerId: number, deckId: number): Promise<void> {
+		await this.ensureStarterDecks(playerId);
+		await this.deckRepository.setCurrentDeck(playerId, deckId);
+	}
+
+	async updateCards(playerId: number, deckId: number, cardIds: string[]): Promise<Deck> {
+		await this.ensureStarterDecks(playerId);
 		await this.collectionService.assertHasCards(playerId, cardIds);
-		return this.deckRepository.updateCards(playerId, cardIds);
+		return this.deckRepository.updateCards(deckId, playerId, cardIds);
 	}
 }

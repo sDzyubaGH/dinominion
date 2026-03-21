@@ -6,9 +6,9 @@ export type DeckWithCards = Deck & {
 };
 
 export class DeckRepository {
-	async findByPlayerId(playerId: number): Promise<DeckWithCards | null> {
+	async findById(id: number): Promise<DeckWithCards | null> {
 		return prisma.deck.findUnique({
-			where: { playerId },
+			where: { id },
 			include: {
 				cards: {
 					include: {
@@ -22,15 +22,92 @@ export class DeckRepository {
 		});
 	}
 
-	async updateName(playerId: number, name: string): Promise<Deck> {
-		return prisma.deck.update({
+	async findManyByPlayerId(playerId: number): Promise<DeckWithCards[]> {
+		return prisma.deck.findMany({
 			where: { playerId },
+			include: {
+				cards: {
+					include: {
+						card: true
+					},
+					orderBy: {
+						position: 'asc'
+					}
+				}
+			},
+			orderBy: {
+				createdAt: 'asc'
+			}
+		});
+	}
+
+	async findCurrentByPlayerId(playerId: number): Promise<DeckWithCards | null> {
+		const player = await prisma.player.findUnique({
+			where: { id: playerId },
+			select: {
+				currentDeckId: true
+			}
+		});
+		if (!player?.currentDeckId) {
+			return null;
+		}
+
+		const deck = await this.findById(player.currentDeckId);
+		return deck?.playerId === playerId ? deck : null;
+	}
+
+	async setCurrentDeck(playerId: number, deckId: number): Promise<void> {
+		const deck = await prisma.deck.findFirst({
+			where: {
+				id: deckId,
+				playerId
+			},
+			select: {
+				id: true
+			}
+		});
+		if (!deck) {
+			throw new Error('Deck not found.');
+		}
+
+		await prisma.player.update({
+			where: { id: playerId },
+			data: {
+				currentDeckId: deck.id
+			}
+		});
+	}
+
+	async updateName(deckId: number, playerId: number, name: string): Promise<Deck> {
+		const deck = await prisma.deck.findFirst({
+			where: {
+				id: deckId,
+				playerId
+			},
+			select: {
+				id: true
+			}
+		});
+		if (!deck) {
+			throw new Error('Deck not found.');
+		}
+
+		return prisma.deck.update({
+			where: { id: deckId },
 			data: { name }
 		});
 	}
 
-	async updateCards(playerId: number, cards: string[]): Promise<Deck> {
-		const deck = await this.findByPlayerId(playerId);
+	async updateCards(deckId: number, playerId: number, cards: string[]): Promise<Deck> {
+		const deck = await prisma.deck.findFirst({
+			where: {
+				id: deckId,
+				playerId
+			},
+			select: {
+				id: true
+			}
+		});
 		if (!deck) {
 			throw new Error('Deck not found.');
 		}
@@ -64,13 +141,13 @@ export class DeckRepository {
 			}
 
 			return tx.deck.update({
-				where: { playerId },
+				where: { id: deckId },
 				data: {}
 			});
 		});
 	}
 
-	async createStarterDeck(playerId: number, cards: string[]): Promise<Deck> {
+	async createDeck(playerId: number, name: string, cards: string[]): Promise<Deck> {
 		const catalogCards = await prisma.card.findMany({
 			where: {
 				slug: {
@@ -87,7 +164,7 @@ export class DeckRepository {
 		return prisma.deck.create({
 			data: {
 				playerId,
-				name: 'Стартовая колода',
+				name,
 				cards: {
 					create: cards.map((cardId, position) => ({
 						cardId: cardIdsBySlug.get(cardId) as number,

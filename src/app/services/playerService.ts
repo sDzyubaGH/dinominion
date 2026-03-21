@@ -19,7 +19,7 @@ export class PlayerService {
 					: existing;
 
 			await this.collectionService.ensureStarterCollection(updatedPlayer.id);
-			await this.deckService.ensureStarterDeck(updatedPlayer.id);
+			await this.deckService.ensureStarterDecks(updatedPlayer.id);
 			return updatedPlayer;
 		}
 
@@ -28,7 +28,7 @@ export class PlayerService {
 			username
 		});
 		await this.collectionService.ensureStarterCollection(player.id);
-		await this.deckService.ensureStarterDeck(player.id);
+		await this.deckService.ensureStarterDecks(player.id);
 		return player;
 	}
 

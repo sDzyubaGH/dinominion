@@ -43,6 +43,24 @@ export function renderDeckEditMenu(deckName: string): string {
 	);
 }
 
+export function renderDeckSwitchMenu(params: {
+	currentDeckName: string;
+	decks: Array<{
+		name: string;
+		isCurrent: boolean;
+	}>;
+}): string {
+	return [
+		'Выбор колоды',
+		'',
+		`Текущая колода: ${params.currentDeckName}`,
+		'',
+		...params.decks.map((deck) => `${deck.isCurrent ? '✅ ' : ''}${deck.name}`),
+		'',
+		'Выберите колоду ниже.'
+	].join('\n');
+}
+
 export function renderDeckCardDetails(
 	card: CardDefinition,
 	cardLookup: (cardId: string) => CardDefinition
