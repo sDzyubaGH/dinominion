@@ -7,7 +7,8 @@ import {
 	renderDeckCardDetails,
 	renderDeckCardsPage,
 	renderDeckEditMenu,
-	renderDeckSummary
+	renderDeckSummary,
+	renderDeckSwitchMenu
 } from '../../infra/telegram/deckRenderer.js';
 import { redis } from '../../infra/redis/redis.js';
 import { getPendingDeckRenameKey } from '../middleware/pendingTextActions.js';
@@ -32,7 +33,9 @@ export function registerDeckHandler(
 				groupedCards: deckView.groupedCards
 			}),
 			{
-				reply_markup: createDeckKeyboard(deckView.groupedCards, { type: 'summary' })
+				reply_markup: createDeckKeyboard(deckView.groupedCards, deckView.decks, {
+					type: 'summary'
+				})
 			}
 		);
 	});
@@ -59,8 +62,24 @@ export function registerDeckHandler(
 
 		if (mode.type === 'edit') {
 			await ctx.editMessageText(renderDeckEditMenu(deckView.deck.name), {
-				reply_markup: createDeckKeyboard(deckView.groupedCards, { type: 'edit' })
+				reply_markup: createDeckKeyboard(deckView.groupedCards, deckView.decks, { type: 'edit' })
 			});
+			await ctx.answerCallbackQuery();
+			return;
+		}
+
+		if (mode.type === 'switch') {
+			await ctx.editMessageText(
+				renderDeckSwitchMenu({
+					currentDeckName: deckView.deck.name,
+					decks: deckView.decks
+				}),
+				{
+					reply_markup: createDeckKeyboard(deckView.groupedCards, deckView.decks, {
+						type: 'switch'
+					})
+				}
+			);
 			await ctx.answerCallbackQuery();
 			return;
 		}
@@ -71,11 +90,35 @@ export function registerDeckHandler(
 		}
 
 		if (mode.type === 'rename') {
-			await redis.set(getPendingDeckRenameKey(ctx.from.id), String(player.id), 'EX', 300);
+			await redis.set(getPendingDeckRenameKey(ctx.from.id), String(deckView.deck.id), 'EX', 300);
 			await ctx.answerCallbackQuery({ text: 'Отправьте новое название колоды в чат.' });
-			await ctx.reply('Отправьте новое название колоды следующим сообщением. Для отмены используйте /cancel.', {
-				reply_markup: { force_reply: true }
-			});
+			await ctx.reply(
+				'Отправьте новое название колоды следующим сообщением. Для отмены используйте /cancel.',
+				{
+					reply_markup: { force_reply: true }
+				}
+			);
+			return;
+		}
+
+		if (mode.type === 'selectDeck') {
+			await deckService.switchCurrentDeck(player.id, mode.deckId);
+			const updatedDeckView = await deckService.getDeck(player.id);
+			await ctx.editMessageText(
+				renderDeckSummary({
+					deckName: updatedDeckView.deck.name,
+					totalCards: updatedDeckView.totalCards,
+					groupedCards: updatedDeckView.groupedCards
+				}),
+				{
+					reply_markup: createDeckKeyboard(
+						updatedDeckView.groupedCards,
+						updatedDeckView.decks,
+						{ type: 'summary' }
+					)
+				}
+			);
+			await ctx.answerCallbackQuery({ text: `Текущая колода: ${updatedDeckView.deck.name}` });
 			return;
 		}
 
@@ -89,6 +132,11 @@ export function registerDeckHandler(
 					})
 				: view.type === 'edit'
 					? renderDeckEditMenu(deckView.deck.name)
+				: view.type === 'switch'
+					? renderDeckSwitchMenu({
+							currentDeckName: deckView.deck.name,
+							decks: deckView.decks
+						})
 				: view.type === 'cards'
 					? renderDeckCardsPage({
 							deckName: deckView.deck.name,
@@ -109,7 +157,7 @@ export function registerDeckHandler(
 						);
 
 		await ctx.editMessageText(text, {
-			reply_markup: createDeckKeyboard(deckView.groupedCards, view)
+			reply_markup: createDeckKeyboard(deckView.groupedCards, deckView.decks, view)
 		});
 		await ctx.answerCallbackQuery();
 	});
@@ -118,13 +166,18 @@ export function registerDeckHandler(
 type ParsedDeckCallback =
 	| { type: 'summary' }
 	| { type: 'edit' }
+	| { type: 'switch' }
 	| { type: 'cards'; page: number }
 	| { type: 'card'; page: number; cardId: string }
 	| { type: 'rename' }
+	| { type: 'selectDeck'; deckId: number }
 	| { type: 'close' }
 	| { type: 'noop' };
 
-type ParsedDeckViewCallback = Extract<ParsedDeckCallback, { type: 'summary' | 'edit' | 'cards' | 'card' }>;
+type ParsedDeckViewCallback = Extract<
+	ParsedDeckCallback,
+	{ type: 'summary' | 'edit' | 'switch' | 'cards' | 'card' }
+>;
 
 function parseDeckCallbackData(data: string): ParsedDeckCallback {
 	const parts = data.split(':');
@@ -139,8 +192,12 @@ function parseDeckCallbackData(data: string): ParsedDeckCallback {
 				return { type: 'summary' };
 			case 'm':
 				return { type: 'edit' };
+			case 'w':
+				return { type: 'switch' };
 			case 'r':
 				return { type: 'rename' };
+			case 'sc':
+				return { type: 'selectDeck', deckId: Number(parts[2]) };
 			case 'x':
 				return { type: 'close' };
 			case 'i':
@@ -158,8 +215,12 @@ function parseDeckCallbackData(data: string): ParsedDeckCallback {
 				return { type: 'summary' };
 			case 'edit':
 				return { type: 'edit' };
+			case 'switch':
+				return { type: 'switch' };
 			case 'rename':
 				return { type: 'rename' };
+			case 'select':
+				return { type: 'selectDeck', deckId: Number(parts[2]) };
 			case 'close':
 				return { type: 'close' };
 			case 'info':
@@ -184,6 +245,10 @@ function resolveDeckView(
 
 	if (mode.type === 'edit') {
 		return { type: 'edit' };
+	}
+
+	if (mode.type === 'switch') {
+		return { type: 'switch' };
 	}
 
 	if (mode.type === 'cards') {

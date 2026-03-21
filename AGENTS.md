@@ -32,6 +32,7 @@ npm run start
 ## Что где находится
 
 - `src/bot` — Telegram entrypoint, handlers и inline keyboards
+- `src/bot/middleware` — middleware для отложенных текстовых действий
 - `src/app/services` — сценарии уровня приложения
 - `src/core` — чистый игровой движок и типы боя
 - `src/infra/prisma` — Prisma client и repository classes
@@ -47,16 +48,17 @@ npm run start
 - В `src/core` нельзя тащить Telegram, Prisma, Redis и любые I/O-зависимости. Этот слой сейчас чистый и тестируется отдельно.
 - Состояние боя должно оставаться JSON-сериализуемым. [`BattleService`](src/app/services/battleService.ts) кладет его в PostgreSQL и в Redis через `JSON.stringify`.
 - Каталог карт, владение картами и состав колоды разделены. `Card` — справочник, `PlayerCard` — инвентарь игрока, `DeckCard` — связь конкретной колоды с картами.
-- Каталог карт и владение картами разделены. `Card` — это справочник, `PlayerCard` — инвентарь игрока с `quantity`.
-- Стартовый onboarding теперь выдает не только колоду, но и стартовую коллекцию. Это делается через `CollectionService`, а не через прямую запись в `Deck`.
-- `/deck` больше не текстовая команда без состояния. У него есть inline navigation и edit flow; callback-часть живет в [`src/bot/handlers/deck.ts`](src/bot/handlers/deck.ts), а ожидание следующего текстового сообщения вынесено в [`src/bot/middleware/pendingTextActions.ts`](src/bot/middleware/pendingTextActions.ts).
+- У игрока теперь несколько колод. Текущая активная колода хранится через `Player.currentDeckId`, а не определяется “единственной декой игрока”.
+- Стартовый onboarding теперь выдает не только коллекцию, но и 3 стартовые колоды из `STARTER_DECKS`: `Раптор Рывок`, `Каменная Охрана`, `Древний Выводок`. Это делается через `CollectionService` и `DeckService`.
+- `/deck` больше не текстовая команда без состояния. У него есть просмотр карт, редактирование, переименование и выбор текущей активной колоды; callback-часть живет в [`src/bot/handlers/deck.ts`](src/bot/handlers/deck.ts), а ожидание следующего текстового сообщения вынесено в [`src/bot/middleware/pendingTextActions.ts`](src/bot/middleware/pendingTextActions.ts).
 - Каталог карт в runtime читается из БД, а не из `cards/starterCards.ts`. После изменения [`cards/starterCards.ts`](/Users/sdzyuba/Documents/dev/dinominion/cards/starterCards.ts) нужно запускать `npm run prisma:seed`.
 - `CardCatalogService` падает, если в БД нет карт или если в колоде/состоянии встречается неизвестный slug. Любые новые card slugs должны быть согласованы между seed, стартовой колодой и тестовыми данными.
-- Стартовая коллекция и стартовая колода оба собираются из [`STARTER_DECK_CARD_IDS`](src/../cards/starterCards.ts). Если меняешь стартовый набор, не оставляй рассинхрон между коллекцией и колодой.
+- Стартовые колоды описаны в `STARTER_DECKS`, а стартовая коллекция собирается из `STARTER_COLLECTION_CARD_IDS`. Если меняешь стартовый набор, не оставляй рассинхрон между этими двумя экспортами.
 - Любое будущее редактирование колоды должно проходить через `DeckService.updateCards`, потому что там есть проверка количества карт против `PlayerCard`, а сохранение состава идет через `DeckCard`.
+- Бой должен брать именно активную колоду игрока через `DeckRepository.findCurrentByPlayerId(...)`. Не подменяй это на “первую попавшуюся” колоду игрока.
 - Группировка карт в колоде и карточка просмотра строятся из `CardDefinition`, а не из сырых Prisma-полей. Если меняешь отображение колоды, смотри [`src/app/services/deckService.ts`](src/app/services/deckService.ts), [`src/bot/keyboards/deckKeyboard.ts`](src/bot/keyboards/deckKeyboard.ts) и [`src/infra/telegram/deckRenderer.ts`](src/infra/telegram/deckRenderer.ts) вместе.
 - Для deck callbacks тоже поддерживаются короткие значения `d:...`. Если появится длинный формат `deck:...`, не ломай совместимость парсера без миграции callback data.
-- Переименование колоды использует временное состояние в Redis с ключом `dino:deck:rename:<telegramId>` и TTL 300 секунд. Текстовый ввод обрабатывается через общий middleware `pendingTextActions`, а не через локальный `bot.on('message:text')` в handler-файлах.
+- Переименование колоды использует временное состояние в Redis с ключом `dino:deck:rename:<telegramId>` и TTL 300 секунд. В key хранится `deckId`, потому что у игрока теперь несколько колод. Текстовый ввод обрабатывается через общий middleware `pendingTextActions`, а не через локальный `bot.on('message:text')` в handler-файлах.
 - Любой новый сценарий вида “нажали кнопку -> ждем следующее сообщение пользователя” лучше добавлять в `src/bot/middleware/pendingTextActions.ts`. Если pending action не найден, middleware обязан делать `next()`, чтобы не ломать команды вроде `/play` и `/battle`.
 - `renameDeck` в `DeckService` сам обрезает пробелы и запрещает пустое имя. Не дублируй другую валидацию имени в нескольких местах без причины.
 - `BattleService.applyActionForTelegramId` уже заворачивает обновление боя в Redis lock. Не пиши обходные обновления battle state мимо этого пути.
@@ -71,7 +73,9 @@ npm run start
 - Добавить новую карту только в `starterCards.ts` и не пересидировать БД.
 - Использовать Prisma `Card.id` там, где сервисы и движок ждут `slug`.
 - Менять стартовый список карт только в одном месте и забыть, что он влияет и на `PlayerCard`, и на `Deck`.
+- Менять `STARTER_DECKS`, но забыть обновить derived `STARTER_COLLECTION_CARD_IDS` логику или сидирование.
 - Менять модель колоды и забыть, что теперь состав хранится не в `Deck`, а в `DeckCard`.
+- Оставить в коде предположение “у игрока одна колода”: после введения `currentDeckId` это уже неверно для боев, `/deck` и rename flow.
 - Добавить импорт без `.js` и получить runtime-ошибку в NodeNext/ESM.
 - Расширить тесты, но забыть, что `npm run test` запускает только `src/tests/core/engine/*.test.ts`.
 - Менять battle callbacks без учета двух существующих форматов парсинга.
@@ -86,7 +90,8 @@ npm run start
 - Сценарную логику размещай в `src/app/services`, а доступ к БД оставляй в `src/infra/prisma/repositories`.
 - Если меняешь выдачу карт игроку, работай через `CollectionService`, а не через прямое редактирование состава колоды.
 - Если меняешь правила боя, сначала обновляй `src/core`, затем рендеринг в `src/infra/telegram/renderer.ts`, потом обработчики кнопок при необходимости.
-- Если меняешь `/deck`, обычно нужно синхронно проверить 4 места: `DeckService`, `deck.ts`, `deckKeyboard.ts`, `deckRenderer.ts`.
+- Если меняешь `/deck`, обычно нужно синхронно проверить 5 мест: `DeckService`, `deck.ts`, `deckKeyboard.ts`, `deckRenderer.ts`, `pendingTextActions.ts`.
+- Если меняешь логику выбора колоды, проверь и `BattleService`: бой должен брать `findCurrentByPlayerId(...)`, а не любую первую колоду игрока.
 - Если меняешь flow ввода текста после кнопок, проверь и `src/bot/middleware/pendingTextActions.ts`, потому что он влияет на порядок прохождения команд через bot middleware chain.
 - Если меняешь сидирование карт, проверь соответствие между [`prisma/seed.ts`](/Users/sdzyuba/Documents/dev/dinominion/prisma/seed.ts), [`cards/starterCards.ts`](/Users/sdzyuba/Documents/dev/dinominion/cards/starterCards.ts) и стартовой колодой в [`src/app/services/deckService.ts`](/Users/sdzyuba/Documents/dev/dinominion/src/app/services/deckService.ts).
 - Не добавляй новую инфраструктурную зависимость в `src/core`; адаптер должен оставаться снаружи.

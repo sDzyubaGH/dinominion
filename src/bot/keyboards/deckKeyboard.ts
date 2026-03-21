@@ -11,6 +11,9 @@ export type DeckViewMode =
 			type: 'edit';
 	  }
 	| {
+			type: 'switch';
+	  }
+	| {
 			type: 'cards';
 			page: number;
 	  }
@@ -26,6 +29,11 @@ export function createDeckKeyboard(
 		definition: CardDefinition;
 		count: number;
 	}>,
+	decks: Array<{
+		id: number;
+		name: string;
+		isCurrent: boolean;
+	}>,
 	mode: DeckViewMode
 ): InlineKeyboard {
 	const keyboard = new InlineKeyboard();
@@ -34,9 +42,9 @@ export function createDeckKeyboard(
 		return keyboard
 			.text('👁 Карты', 'd:v:0')
 			.row()
-			.text('✏️ Редактирование', 'd:m')
+			.text('🔁 Поменять колоду', 'd:w')
 			.row()
-			.text('◀️ Назад', 'd:x');
+			.text('✏️ Редактирование', 'd:m');
 	}
 
 	if (mode.type === 'edit') {
@@ -44,6 +52,16 @@ export function createDeckKeyboard(
 			.text('✏️ Изменить название', 'd:r')
 			.row()
 			.text('◀️ Назад', 'd:s');
+	}
+
+	if (mode.type === 'switch') {
+		for (const deck of decks) {
+			keyboard
+				.text(`${deck.isCurrent ? '✅ ' : ''}${deck.name}`, `d:sc:${deck.id}`)
+				.row();
+		}
+
+		return keyboard.text('◀️ Назад', 'd:s');
 	}
 
 	if (mode.type === 'cards') {

@@ -3,7 +3,7 @@ import type { BattleParticipantState, BattleState } from '../types/BattleState.j
 
 export const STARTING_HEALTH = 20;
 export const MAX_ENERGY = 10;
-export const MAX_BOARD_SIZE = 3;
+export const MAX_BOARD_SIZE = 6;
 
 export function getOpponent(state: BattleState, playerId: number): BattleParticipantState {
 	const opponent = Object.values(state.players).find((player) => player.id !== playerId);

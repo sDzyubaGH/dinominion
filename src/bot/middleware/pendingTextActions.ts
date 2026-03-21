@@ -19,6 +19,11 @@ export function createPendingTextActionsMiddleware(
 		if (!pendingRename) {
 			return next();
 		}
+		const pendingDeckId = Number(pendingRename);
+		if (!Number.isFinite(pendingDeckId)) {
+			await redis.del(pendingRenameKey);
+			return next();
+		}
 
 		const text = ctx.message.text.trim();
 		if (text === '/cancel') {
@@ -39,7 +44,7 @@ export function createPendingTextActionsMiddleware(
 		}
 
 		try {
-			await deckService.renameDeck(player.id, text);
+			await deckService.renameDeck(player.id, pendingDeckId, text);
 			await redis.del(pendingRenameKey);
 
 			const deckView = await deckService.getDeck(player.id);
@@ -54,7 +59,11 @@ export function createPendingTextActionsMiddleware(
 					})
 				].join('\n'),
 				{
-					reply_markup: createDeckKeyboard(deckView.groupedCards, { type: 'summary' })
+					reply_markup: createDeckKeyboard(
+						deckView.groupedCards,
+						deckView.decks,
+						{ type: 'summary' }
+					)
 				}
 			);
 		} catch (error) {
