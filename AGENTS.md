@@ -111,6 +111,9 @@ npm run prisma:seed
 
 ## TODO
 
-- В репозитории нет `.env.example`.
 - В репозитории не зафиксирована версия Node.js через `.nvmrc` или `engines`.
 - Для сервисов и инфраструктуры нет отдельной тестовой команды в `package.json`.
+
+## Maintenance
+- Keep this file in sync with the codebase.
+- If commands, structure, or architecture change — update this file.
