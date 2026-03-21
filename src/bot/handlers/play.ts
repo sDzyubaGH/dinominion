@@ -14,6 +14,8 @@ export function registerPlayHandler(
 	battleService: BattleService
 ): void {
 	bot.command('play', async (ctx) => {
+		console.log('playe command handler');
+
 		if (!ctx.from) {
 			return;
 		}

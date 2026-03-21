@@ -10,6 +10,7 @@ import { registerDeckHandler } from './handlers/deck.js';
 import { registerPlayHandler } from './handlers/play.js';
 import { registerProfileHandler } from './handlers/profile.js';
 import { registerStartHandler } from './handlers/start.js';
+import { createPendingTextActionsMiddleware } from './middleware/pendingTextActions.js';
 import { BattleRepository } from '../infra/prisma/repositories/battleRepository.js';
 import { CardRepository } from '../infra/prisma/repositories/cardRepository.js';
 import { DeckRepository } from '../infra/prisma/repositories/deckRepository.js';
@@ -46,6 +47,8 @@ const matchmakingService = new MatchmakingService(
 	playerRepository,
 	battleService
 );
+
+bot.use(createPendingTextActionsMiddleware(playerService, deckService));
 
 registerStartHandler(bot, playerService);
 registerProfileHandler(bot, playerService);
