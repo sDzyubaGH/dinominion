@@ -1,27 +1,15 @@
 import type { Deck } from '@prisma/client';
+import { STARTER_DECK_CARD_IDS } from '../../../cards/starterCards.js';
 import type { CardDefinition } from '../../core/entities/Card.js';
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { CardCatalogService } from './cardCatalogService.js';
-
-const STARTER_DECK_CARD_SLUGS: string[] = [
-	'forest-raptor',
-	'forest-raptor',
-	'alpha-raptor',
-	'ridge-triceratops',
-	'ridge-triceratops',
-	'horned-guardian',
-	'horned-guardian',
-	'cliff-stalker',
-	'marsh-hunter',
-	'marsh-hunter',
-	'ancient-egg',
-	'reedback-brute'
-];
+import { CollectionService } from './collectionService.js';
 
 export class DeckService {
 	constructor(
 		private readonly deckRepository: DeckRepository,
-		private readonly cardCatalogService: CardCatalogService
+		private readonly cardCatalogService: CardCatalogService,
+		private readonly collectionService: CollectionService
 	) {}
 
 	async ensureStarterDeck(playerId: number): Promise<Deck> {
@@ -30,7 +18,9 @@ export class DeckService {
 			return existingDeck;
 		}
 
-		return this.deckRepository.createStarterDeck(playerId, STARTER_DECK_CARD_SLUGS);
+		await this.collectionService.ensureStarterCollection(playerId);
+		await this.collectionService.assertHasCards(playerId, STARTER_DECK_CARD_IDS);
+		return this.deckRepository.createStarterDeck(playerId, STARTER_DECK_CARD_IDS);
 	}
 
 	async getDeck(playerId: number): Promise<{
@@ -70,5 +60,11 @@ export class DeckService {
 
 		await this.ensureStarterDeck(playerId);
 		return this.deckRepository.updateName(playerId, trimmedName);
+	}
+
+	async updateCards(playerId: number, cardIds: string[]): Promise<Deck> {
+		await this.ensureStarterDeck(playerId);
+		await this.collectionService.assertHasCards(playerId, cardIds);
+		return this.deckRepository.updateCards(playerId, cardIds);
 	}
 }

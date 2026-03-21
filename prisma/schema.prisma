@@ -48,6 +48,7 @@ model Player {
 	createdAt        DateTime @default(now())
 	updatedAt        DateTime @updatedAt
 	deck             Deck?
+	cards            PlayerCard[]
 	battlesAsPlayer1 Battle[] @relation("BattlePlayer1")
 	battlesAsPlayer2 Battle[] @relation("BattlePlayer2")
 	wonBattles       Battle[] @relation("BattleWinner")
@@ -77,8 +78,24 @@ model Card {
 	createdAt   DateTime     @default(now())
 	updatedAt   DateTime     @updatedAt
 	effects     CardEffect[]
+	playerCards PlayerCard[]
 
 	@@index([type, isActive])
+}
+
+model PlayerCard {
+	id        Int      @id @default(autoincrement())
+	playerId  Int
+	cardId    Int
+	quantity  Int      @default(1)
+	createdAt DateTime @default(now())
+	updatedAt DateTime @updatedAt
+	player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+	@@unique([playerId, cardId])
+	@@index([playerId])
+	@@index([cardId])
 }
 
 model Battle {
