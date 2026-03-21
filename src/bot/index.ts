@@ -13,10 +13,12 @@ import { registerStartHandler } from './handlers/start.js';
 import { BattleRepository } from '../infra/prisma/repositories/battleRepository.js';
 import { CardRepository } from '../infra/prisma/repositories/cardRepository.js';
 import { DeckRepository } from '../infra/prisma/repositories/deckRepository.js';
+import { PlayerCardRepository } from '../infra/prisma/repositories/playerCardRepository.js';
 import { PlayerRepository } from '../infra/prisma/repositories/playerRepository.js';
 import { redis } from '../infra/redis/redis.js';
 import { MatchmakingQueue } from '../infra/redis/queue.js';
 import { RedisLockService } from '../infra/redis/locks.js';
+import { CollectionService } from '../app/services/collectionService.js';
 
 const bot = new Bot(env.botToken);
 
@@ -24,9 +26,11 @@ const playerRepository = new PlayerRepository();
 const deckRepository = new DeckRepository();
 const battleRepository = new BattleRepository();
 const cardRepository = new CardRepository();
+const playerCardRepository = new PlayerCardRepository();
 const cardCatalogService = new CardCatalogService(cardRepository);
-const deckService = new DeckService(deckRepository, cardCatalogService);
-const playerService = new PlayerService(playerRepository, deckService);
+const collectionService = new CollectionService(playerCardRepository, cardRepository);
+const deckService = new DeckService(deckRepository, cardCatalogService, collectionService);
+const playerService = new PlayerService(playerRepository, collectionService, deckService);
 const lockService = new RedisLockService(redis);
 const battleService = new BattleService(
 	battleRepository,

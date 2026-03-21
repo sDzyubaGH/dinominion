@@ -47,9 +47,13 @@ npm run start
 - В `src/core` нельзя тащить Telegram, Prisma, Redis и любые I/O-зависимости. Этот слой сейчас чистый и тестируется отдельно.
 - Состояние боя должно оставаться JSON-сериализуемым. [`BattleService`](src/app/services/battleService.ts) кладет его в PostgreSQL и в Redis через `JSON.stringify`.
 - `Deck.cardsJson` хранит не числовые `Card.id`, а строковые `slug` карт. Не переключай логику боя или колод на integer `id` без полной миграции.
+- Каталог карт и владение картами разделены. `Card` — это справочник, `PlayerCard` — инвентарь игрока с `quantity`.
+- Стартовый onboarding теперь выдает не только колоду, но и стартовую коллекцию. Это делается через `CollectionService`, а не через прямую запись в `Deck`.
 - `/deck` больше не текстовая команда без состояния. У него есть inline navigation, pagination и edit flow в [`src/bot/handlers/deck.ts`](src/bot/handlers/deck.ts).
 - Каталог карт в runtime читается из БД, а не из `cards/starterCards.ts`. После изменения [`cards/starterCards.ts`](/Users/sdzyuba/Documents/dev/dinominion/cards/starterCards.ts) нужно запускать `npm run prisma:seed`.
 - `CardCatalogService` падает, если в БД нет карт или если в колоде/состоянии встречается неизвестный slug. Любые новые card slugs должны быть согласованы между seed, стартовой колодой и тестовыми данными.
+- Стартовая коллекция и стартовая колода оба собираются из [`STARTER_DECK_CARD_IDS`](src/../cards/starterCards.ts). Если меняешь стартовый набор, не оставляй рассинхрон между коллекцией и колодой.
+- Любое будущее редактирование колоды должно проходить через `DeckService.updateCards`, потому что там есть проверка количества карт против `PlayerCard`.
 - Группировка карт в колоде и карточка просмотра строятся из `CardDefinition`, а не из сырых Prisma-полей. Если меняешь отображение колоды, смотри [`src/app/services/deckService.ts`](src/app/services/deckService.ts), [`src/bot/keyboards/deckKeyboard.ts`](src/bot/keyboards/deckKeyboard.ts) и [`src/infra/telegram/deckRenderer.ts`](src/infra/telegram/deckRenderer.ts) вместе.
 - Для deck callbacks тоже поддерживаются короткие значения `d:...`. Если появится длинный формат `deck:...`, не ломай совместимость парсера без миграции callback data.
 - Переименование колоды использует временное состояние в Redis с ключом `dino:deck:rename:<telegramId>` и TTL 300 секунд. Если меняешь rename flow, не оставляй ключи без удаления после успеха или отмены.
@@ -65,6 +69,7 @@ npm run start
 - Изменить доменные типы и забыть, что старое состояние читается из `battleStateJson` и Redis-кэша.
 - Добавить новую карту только в `starterCards.ts` и не пересидировать БД.
 - Использовать Prisma `Card.id` там, где остальной код ждет `slug`.
+- Менять стартовый список карт только в одном месте и забыть, что он влияет и на `PlayerCard`, и на `Deck`.
 - Добавить импорт без `.js` и получить runtime-ошибку в NodeNext/ESM.
 - Расширить тесты, но забыть, что `npm run test` запускает только `src/tests/core/engine/*.test.ts`.
 - Менять battle callbacks без учета двух существующих форматов парсинга.
@@ -76,6 +81,7 @@ npm run start
 
 - Новую Telegram-команду регистрируй в `src/bot/index.ts` и выноси обработчик в `src/bot/handlers`.
 - Сценарную логику размещай в `src/app/services`, а доступ к БД оставляй в `src/infra/prisma/repositories`.
+- Если меняешь выдачу карт игроку, работай через `CollectionService`, а не через прямое редактирование `Deck.cardsJson`.
 - Если меняешь правила боя, сначала обновляй `src/core`, затем рендеринг в `src/infra/telegram/renderer.ts`, потом обработчики кнопок при необходимости.
 - Если меняешь `/deck`, обычно нужно синхронно проверить 4 места: `DeckService`, `deck.ts`, `deckKeyboard.ts`, `deckRenderer.ts`.
 - Если меняешь сидирование карт, проверь соответствие между [`prisma/seed.ts`](/Users/sdzyuba/Documents/dev/dinominion/prisma/seed.ts), [`cards/starterCards.ts`](/Users/sdzyuba/Documents/dev/dinominion/cards/starterCards.ts) и стартовой колодой в [`src/app/services/deckService.ts`](/Users/sdzyuba/Documents/dev/dinominion/src/app/services/deckService.ts).

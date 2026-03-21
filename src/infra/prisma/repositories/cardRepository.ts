@@ -4,6 +4,16 @@ import { prisma } from '../client.js';
 export type CardWithEffects = Card & { effects: CardEffect[] };
 
 export class CardRepository {
+	async findManyBySlugs(cardSlugs: string[]): Promise<Card[]> {
+		return prisma.card.findMany({
+			where: {
+				slug: {
+					in: cardSlugs
+				}
+			}
+		});
+	}
+
 	async findAllWithEffects(): Promise<CardWithEffects[]> {
 		return prisma.card.findMany({
 			include: {

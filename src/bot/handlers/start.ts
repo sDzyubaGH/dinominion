@@ -12,7 +12,7 @@ export function registerStartHandler(bot: Bot<Context>, playerService: PlayerSer
 		await ctx.reply(
 			[
 				`Добро пожаловать в Dino Clash, ${player.username ? `@${player.username}` : 'командир'}.`,
-				'Стартовая колода готова.',
+				'Стартовая коллекция и колода готовы.',
 				'Используйте /play, чтобы встать в очередь на матч.'
 			].join('\n'),
 			{

@@ -1,10 +1,12 @@
 import type { Player } from '@prisma/client';
+import { CollectionService } from './collectionService.js';
 import { DeckService } from './deckService.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
 
 export class PlayerService {
 	constructor(
 		private readonly playerRepository: PlayerRepository,
+		private readonly collectionService: CollectionService,
 		private readonly deckService: DeckService
 	) {}
 
@@ -16,6 +18,7 @@ export class PlayerService {
 					? await this.playerRepository.updateUsername(existing.id, username)
 					: existing;
 
+			await this.collectionService.ensureStarterCollection(updatedPlayer.id);
 			await this.deckService.ensureStarterDeck(updatedPlayer.id);
 			return updatedPlayer;
 		}
@@ -24,6 +27,7 @@ export class PlayerService {
 			telegramId,
 			username
 		});
+		await this.collectionService.ensureStarterCollection(player.id);
 		await this.deckService.ensureStarterDeck(player.id);
 		return player;
 	}
