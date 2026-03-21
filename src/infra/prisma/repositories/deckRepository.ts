@@ -8,6 +8,13 @@ export class DeckRepository {
 		});
 	}
 
+	async updateName(playerId: number, name: string): Promise<Deck> {
+		return prisma.deck.update({
+			where: { playerId },
+			data: { name }
+		});
+	}
+
 	async createStarterDeck(playerId: number, cards: string[]): Promise<Deck> {
 		return prisma.deck.create({
 			data: {

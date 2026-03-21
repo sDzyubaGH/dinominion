@@ -45,7 +45,7 @@ const matchmakingService = new MatchmakingService(
 
 registerStartHandler(bot, playerService);
 registerProfileHandler(bot, playerService);
-registerDeckHandler(bot, playerService, deckService);
+registerDeckHandler(bot, playerService, deckService, cardCatalogService);
 registerPlayHandler(bot, playerService, cardCatalogService, matchmakingService, battleService);
 registerBattleHandler(bot, playerService, cardCatalogService, battleService);
 
