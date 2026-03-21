@@ -55,13 +55,13 @@ model Player {
 }
 
 model Deck {
-	id        Int      @id @default(autoincrement())
-	playerId  Int      @unique
+	id        Int        @id @default(autoincrement())
+	playerId  Int        @unique
 	name      String
-	cardsJson Json
-	createdAt DateTime @default(now())
-	updatedAt DateTime @updatedAt
-	player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	createdAt DateTime   @default(now())
+	updatedAt DateTime   @updatedAt
+	player    Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+	cards     DeckCard[]
 }
 
 model Card {
@@ -79,8 +79,23 @@ model Card {
 	updatedAt   DateTime     @updatedAt
 	effects     CardEffect[]
 	playerCards PlayerCard[]
+	deckCards   DeckCard[]
 
 	@@index([type, isActive])
+}
+
+model DeckCard {
+	id        Int      @id @default(autoincrement())
+	deckId     Int
+	cardId     Int
+	position   Int
+	createdAt DateTime @default(now())
+	deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+	card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+	@@index([deckId])
+	@@index([cardId])
+	@@unique([deckId, position])
 }
 
 model PlayerCard {

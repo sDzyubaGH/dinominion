@@ -53,10 +53,12 @@ export class BattleService {
 		if (!deck1 || !deck2) {
 			throw new Error('Both players must have a deck.');
 		}
+		const deck1CardIds = deck1.cards.map((card) => card.card.slug);
+		const deck2CardIds = deck2.cards.map((card) => card.card.slug);
 
 		const cardLookup = await this.cardCatalogService.getLookupByIds([
-			...(deck1.cardsJson as string[]),
-			...(deck2.cardsJson as string[])
+			...deck1CardIds,
+			...deck2CardIds
 		]);
 		const startingPlayerId = player1.id;
 		const battle = await this.battleRepository.create({
@@ -69,8 +71,8 @@ export class BattleService {
 			battleId: battle.id,
 			player1Id: player1.id,
 			player2Id: player2.id,
-			player1Deck: shuffleDeck(deck1.cardsJson as string[]),
-			player2Deck: shuffleDeck(deck2.cardsJson as string[]),
+			player1Deck: shuffleDeck(deck1CardIds),
+			player2Deck: shuffleDeck(deck2CardIds),
 			startingPlayerId,
 			cardLookup
 		});

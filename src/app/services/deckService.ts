@@ -1,7 +1,7 @@
 import type { Deck } from '@prisma/client';
 import { STARTER_DECK_CARD_IDS } from '../../../cards/starterCards.js';
 import type { CardDefinition } from '../../core/entities/Card.js';
-import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
+import { DeckRepository, type DeckWithCards } from '../../infra/prisma/repositories/deckRepository.js';
 import { CardCatalogService } from './cardCatalogService.js';
 import { CollectionService } from './collectionService.js';
 
@@ -12,7 +12,7 @@ export class DeckService {
 		private readonly collectionService: CollectionService
 	) {}
 
-	async ensureStarterDeck(playerId: number): Promise<Deck> {
+	async ensureStarterDeck(playerId: number): Promise<DeckWithCards> {
 		const existingDeck = await this.deckRepository.findByPlayerId(playerId);
 		if (existingDeck) {
 			return existingDeck;
@@ -20,7 +20,14 @@ export class DeckService {
 
 		await this.collectionService.ensureStarterCollection(playerId);
 		await this.collectionService.assertHasCards(playerId, STARTER_DECK_CARD_IDS);
-		return this.deckRepository.createStarterDeck(playerId, STARTER_DECK_CARD_IDS);
+		await this.deckRepository.createStarterDeck(playerId, STARTER_DECK_CARD_IDS);
+
+		const createdDeck = await this.deckRepository.findByPlayerId(playerId);
+		if (!createdDeck) {
+			throw new Error('Deck could not be created.');
+		}
+
+		return createdDeck;
 	}
 
 	async getDeck(playerId: number): Promise<{
@@ -33,7 +40,7 @@ export class DeckService {
 		}>;
 	}> {
 		const deck = await this.ensureStarterDeck(playerId);
-		const cardIds = deck.cardsJson as string[];
+		const cardIds = deck.cards.map((card) => card.card.slug);
 		const lookup = await this.cardCatalogService.getLookup();
 		const counts = new Map<string, number>();
 

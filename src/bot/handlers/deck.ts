@@ -10,6 +10,7 @@ import {
 	renderDeckSummary
 } from '../../infra/telegram/deckRenderer.js';
 import { redis } from '../../infra/redis/redis.js';
+import { getPendingDeckRenameKey } from '../middleware/pendingTextActions.js';
 
 export function registerDeckHandler(
 	bot: Bot<Context>,
@@ -34,59 +35,6 @@ export function registerDeckHandler(
 				reply_markup: createDeckKeyboard(deckView.groupedCards, { type: 'summary' })
 			}
 		);
-	});
-
-	bot.on('message:text', async (ctx) => {
-		if (!ctx.from) {
-			return;
-		}
-
-		const pendingRenameKey = getPendingDeckRenameKey(ctx.from.id);
-		const pendingRename = await redis.get(pendingRenameKey);
-		if (!pendingRename) {
-			return;
-		}
-
-		const text = ctx.message.text.trim();
-		if (text === '/cancel') {
-			await redis.del(pendingRenameKey);
-			await ctx.reply('Переименование колоды отменено.');
-			return;
-		}
-
-		if (text.startsWith('/')) {
-			return;
-		}
-
-		const player = await playerService.getProfile(BigInt(ctx.from.id));
-		if (!player) {
-			await redis.del(pendingRenameKey);
-			await ctx.reply('Профиль не найден. Сначала выполните /start.');
-			return;
-		}
-
-		try {
-			await deckService.renameDeck(player.id, text);
-			await redis.del(pendingRenameKey);
-
-			const deckView = await deckService.getDeck(player.id);
-			await ctx.reply(
-				[
-					`Название колоды обновлено: ${deckView.deck.name}`,
-					'',
-					renderDeckSummary({
-						deckName: deckView.deck.name,
-						totalCards: deckView.totalCards,
-						groupedCards: deckView.groupedCards
-					})
-				].join('\n'),
-				{
-					reply_markup: createDeckKeyboard(deckView.groupedCards, { type: 'summary' })
-				}
-			);
-		} catch (error) {
-			await ctx.reply(error instanceof Error ? error.message : 'Не удалось изменить название.');
-		}
 	});
 
 	bot.callbackQuery(/^(deck:|d:)/, async (ctx) => {
@@ -266,8 +214,4 @@ function resolveDeckView(
 
 function clampDeckPage(page: number, totalPages: number): number {
 	return Math.min(Math.max(page, 0), totalPages - 1);
-}
-
-function getPendingDeckRenameKey(telegramId: number): string {
-	return `dino:deck:rename:${telegramId}`;
 }
