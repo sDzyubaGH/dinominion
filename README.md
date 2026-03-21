@@ -1,128 +1,164 @@
-# Dino Clash Bot MVP
+# dinominion-telegram-bot
 
-Minimal dinosaur-themed turn-based collectible card game MVP for Telegram Bot.
+Telegram-бот с пошаговой карточной PvP-игрой про динозавров. Проект написан на Node.js и TypeScript, использует `grammy` для Telegram-интерфейса, Prisma и PostgreSQL для постоянного хранения, Redis для очереди матчмейкинга, блокировок и кэша активных боев.
 
-## Stack
+## Стек
 
 - Node.js
 - TypeScript
-- grammY
+- `grammy`
+- Prisma
 - PostgreSQL
 - Redis
-- Prisma
+- `tsx`
+- ESLint
+- Prettier
+- встроенный `node:test`
 
-## MVP Features
+## Package Manager
 
-- Player registration via `/start`
-- Automatic starter deck creation
-- Matchmaking queue via Redis
-- Persistent players, decks, and battles via PostgreSQL + Prisma
-- Active battle state and locks in Redis
-- Async 1v1 battles in private Telegram chats
-- Turn system, draw, play card, attack, end turn, win/lose
-- Simple dinosaur mechanics: Pack, Egg, Guard
+- `npm`
 
-## Commands
+Причина: в репозитории есть `package-lock.json`, а команды в проекте оформлены через `npm run ...`.
 
-- `/start` register player and create starter deck
-- `/profile` show player info
-- `/deck` show starter deck
-- `/play` join matchmaking queue
-- `/battle` show current active battle
+## Команды
 
-## Environment
+- `npm run dev` — запуск бота через `tsx`
+- `npm run build` — сборка TypeScript в `dist`
+- `npm run start` — запуск собранной версии из `dist/src/bot/index.js`
+- `npm run test` — запуск тестов движка из `src/tests/core/engine/*.test.ts`
+- `npm run test:watch` — запуск тестов движка в watch-режиме
+- `npm run lint` — проверка ESLint
+- `npm run lint:fix` — автоисправление ESLint
+- `npm run format` — форматирование Prettier
+- `npm run format:check` — проверка форматирования
+- `npm run prisma:generate` — генерация Prisma Client
+- `npm run prisma:migrate` — запуск Prisma migrations в dev-режиме
+- `npm run prisma:seed` — сидирование карточного каталога
 
-Copy `.env.example` and fill values:
+## Переменные окружения
+
+Приложение требует:
 
 ```env
 BOT_TOKEN=...
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/dino_clash
-REDIS_URL=redis://localhost:6379
+DATABASE_URL=...
+REDIS_URL=...
 ```
 
-## Setup
+`src/config/env.ts` завершает процесс с ошибкой, если любой из этих параметров отсутствует.
 
-1. Install dependencies:
+## Быстрый запуск
+
+1. Установить зависимости:
 
 ```bash
 npm install
 ```
 
-2. Generate Prisma client:
+2. Сгенерировать Prisma Client:
 
 ```bash
 npm run prisma:generate
 ```
 
-3. Run migration:
+3. Применить миграции:
 
 ```bash
-npm run prisma:migrate -- --name init
+npm run prisma:migrate
 ```
 
-4. Seed cards into `Card` and `CardEffect` tables:
+4. Заполнить каталог карт:
 
 ```bash
 npm run prisma:seed
 ```
 
-5. Start PostgreSQL and Redis.
+5. Запустить PostgreSQL и Redis.
 
-6. Start the bot:
+6. Запустить бота:
 
 ```bash
 npm run dev
 ```
 
-## Scripts
+## Telegram-команды
 
-- `npm run dev`
-- `npm run build`
-- `npm run start`
-- `npm run lint`
-- `npm run format`
-- `npm run prisma:generate`
-- `npm run prisma:migrate`
-- `npm run prisma:seed`
+- `/start` — регистрация игрока и создание стартовой колоды
+- `/profile` — просмотр профиля
+- `/deck` — просмотр колоды
+- `/play` — вход в очередь на матч
+- `/battle` — открытие активного боя
 
-## Battle Flow
-
-1. Two users run `/start`
-2. Both run `/play`
-3. Redis queue matches them
-4. Bot sends battle messages to both players
-5. Current player uses inline buttons:
-    - `View hand`
-    - `Play card`
-    - `Attack`
-    - `End turn`
-    - `Refresh battle`
-
-## Example Battle Message
+## Структура проекта
 
 ```text
-🦖 Dino Clash
-
-Turn: @player1
-Energy: 3/3
-
-@player1
-❤️ 20 HP
-Board:
-1. Forest Raptor 3/2
-2. Ancient Egg (hatches in 1)
-Hand: 3 cards
-
-@player2
-❤️ 18 HP
-Board:
-1. Horned Guardian 1/4 [Guard]
-Hand: 4 cards
+cards/                       Стартовые определения карт для сида и тестов
+prisma/                      Prisma schema, миграции и seed
+src/
+  app/services/              Прикладные сервисы сценариев
+  bot/                       Telegram bot entrypoint, handlers, keyboards
+  config/                    Чтение env-переменных
+  core/                      Чистая игровая модель и правила
+    engine/                  Игровой движок, правила, валидаторы
+    entities/                Доменные сущности карт и боя
+    types/                   Доменные типы состояния и действий
+  infra/
+    prisma/                  Prisma client и репозитории
+    redis/                   Redis-клиент, очередь, блокировки
+    telegram/                Рендеринг текста для Telegram
+  tests/core/engine/         Тесты доменного движка
 ```
 
-## Notes
+## Архитектура
 
-- The domain engine in `src/domain` is pure and does not depend on Telegram, Prisma, or Redis.
-- Redis stores queue, active battle cache, battle view references, and battle locks.
-- PostgreSQL stores durable metadata and battle history.
-- Long polling is used for simplicity.
+Проект построен как слоистое приложение.
+
+- `src/bot` — транспортный слой Telegram. Здесь регистрируются команды и callback-обработчики.
+- `src/app/services` — orchestration layer. Сервисы координируют репозитории, Redis и доменный движок.
+- `src/core` — чистая доменная логика. `gameEngine.ts`, `rules.ts` и `validators.ts` не зависят от Telegram, Prisma и Redis.
+- `src/infra` — адаптеры к внешним системам: Prisma, Redis и Telegram rendering.
+
+Наблюдаемые паттерны в коде:
+
+- Layered architecture
+- Repository pattern для доступа к Prisma
+- Service layer для сценариев регистрации, колод, матчмейкинга и боя
+- Composition root в [`src/bot/index.ts`](/Users/sdzyuba/Documents/dev/dinominion/src/bot/index.ts), где вручную создаются зависимости
+- Чистый domain engine, который принимает состояние и действие и возвращает новое состояние
+- Redis lock wrapper для сериализации матчмейкинга и действий боя
+
+## Как устроен бой
+
+- При старте бота в [`src/bot/index.ts`](/Users/sdzyuba/Documents/dev/dinominion/src/bot/index.ts) собираются все зависимости.
+- `/play` ставит игрока в Redis-очередь через `MatchmakingQueue`.
+- При совпадении пары `BattleService` создает запись боя в PostgreSQL и инициализирует `BattleState`.
+- Актуальное состояние боя хранится и в PostgreSQL, и в Redis-кэше.
+- Действия игрока проходят через `BattleService.applyActionForTelegramId`, затем в `core/engine/applyAction`.
+- Telegram-сообщения обновляются через `refreshBattleViews`.
+
+## Тесты
+
+Сейчас тестами покрыт только доменный движок в `src/tests/core/engine`.
+
+- используется встроенный раннер `node:test`
+- TypeScript выполняется через `node --import tsx --test`
+- есть unit-тесты для правил движка и валидаторов
+- инфраструктурных и e2e-тестов в репозитории нет
+
+## Стиль кода
+
+По конфигам проекта:
+
+- TypeScript в `strict`-режиме
+- ESM-модули (`"type": "module"`, `module: "NodeNext"`)
+- локальные импорты пишутся с расширением `.js`
+- Prettier: табы, `tabWidth: 4`, `singleQuote: true`, `semi: true`, `trailingComma: 'none'`
+- ESLint игнорирует `dist` и `node_modules`
+- `console` разрешен
+
+## TODO
+
+- TODO: в репозитории нет `.env.example`, хотя переменные окружения обязательны
+- TODO: версия Node.js явно не зафиксирована через `.nvmrc` или `engines`
+- TODO: в `npm run test` запускаются только тесты из `src/tests/core/engine`, остальные слои пока не покрыты
