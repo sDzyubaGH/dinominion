@@ -1,5 +1,6 @@
-import type { Api, Bot, Context } from 'grammy';
+import type { Bot, Context } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
+import type { BattleViewService } from '../../app/services/battleViewService.js';
 import type { CardCatalogService } from '../../app/services/cardCatalogService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
 import { createBattleKeyboard, type BattleViewMode } from '../keyboards/battleKeyboard.js';
@@ -13,7 +14,8 @@ export function registerBattleHandler(
 	bot: Bot<Context>,
 	playerService: PlayerService,
 	cardCatalogService: CardCatalogService,
-	battleService: BattleService
+	battleService: BattleService,
+	battleViewService: BattleViewService
 ): void {
 	bot.command('battle', async (ctx) => {
 		if (!ctx.from) {
@@ -108,7 +110,7 @@ export function registerBattleHandler(
 						cardInstanceId: parsed.cardInstanceId
 					}
 				});
-				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
+				await battleViewService.refreshBattleViews(snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Карта разыграна.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -129,7 +131,7 @@ export function registerBattleHandler(
 						target: { type: 'hero' }
 					}
 				});
-				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
+				await battleViewService.refreshBattleViews(snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -150,7 +152,7 @@ export function registerBattleHandler(
 						target: { type: 'unit', unitId: parsed.targetUnitId }
 					}
 				});
-				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
+				await battleViewService.refreshBattleViews(snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Атака выполнена.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -169,7 +171,7 @@ export function registerBattleHandler(
 						type: 'end_turn'
 					}
 				});
-				await refreshBattleViews(bot.api, cardCatalogService, battleService, snapshot.battle.id);
+				await battleViewService.refreshBattleViews(snapshot.battle.id);
 				await ctx.answerCallbackQuery({ text: 'Ход завершен.' });
 			} catch (error) {
 				await ctx.answerCallbackQuery({
@@ -209,40 +211,6 @@ async function renderView(
 		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode, cardLookup)
 	});
 	await ctx.answerCallbackQuery();
-}
-
-async function refreshBattleViews(
-	api: Api,
-	cardCatalogService: CardCatalogService,
-	battleService: BattleService,
-	battleId: number
-): Promise<void> {
-	const snapshot = await battleService.getBattleSnapshotById(battleId);
-	if (!snapshot) {
-		return;
-	}
-
-	const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
-	const refs = await battleService.getBattleMessageRefs(battleId);
-	for (const ref of refs) {
-		try {
-			await api.editMessageText(
-				ref.chatId,
-				ref.messageId,
-				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
-				{
-					reply_markup: createBattleKeyboard(
-						snapshot.state,
-						ref.playerId,
-						{ type: 'default' },
-						cardLookup
-					)
-				}
-			);
-		} catch {
-			// Ignore deleted or stale messages in this MVP.
-		}
-	}
 }
 
 type ParsedBattleCallback =

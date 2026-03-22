@@ -18,6 +18,14 @@ npm run prisma:seed
 npm run dev
 ```
 
+AI worker:
+
+```bash
+npm run ai:worker
+```
+
+Для локальной игры с ботами нужны оба процесса: `npm run dev` и `npm run ai:worker`.
+
 Production:
 
 ```bash
@@ -31,6 +39,7 @@ npm run start
 
 - `src/bot` — Telegram handlers, keyboards
 - `src/bot/middleware` — pending text actions
+- `src/workers` — background workers
 - `src/app/services` — orchestration
 - `src/core` — чистый движок
 - `src/infra/prisma` — Prisma repositories
@@ -45,8 +54,10 @@ npm run start
 - `PlayerCard` — инвентарь игрока (`quantity`)
 - `DeckCard` — состав колоды
 - `Player.currentDeckId` — активная колода игрока
+- `Player.isBot` — признак AI-игрока
 
 Не возвращайся к предположению “у игрока одна колода”.
+Не возвращайся к предположению “есть один глобальный bot player”.
 
 ## Стартовые данные
 
@@ -70,6 +81,11 @@ npm run start
 - Бой должен брать колоду только через `DeckRepository.findCurrentByPlayerId(...)`.
 - Любое редактирование состава колоды должно идти через `DeckService.updateCards(...)`.
 - Проверка доступных копий карт должна идти через `CollectionService`, не через UI.
+- AI ходы не выполняются в Telegram handlers. Они планируются через Redis `AiTurnQueue` и исполняются в `src/workers/aiWorker.ts`.
+- Fallback против бота идет через `MatchmakingService.matchTimedOutPlayerWithAi(...)`.
+- AI больше не один глобальный игрок. `AiPlayerService.ensureAvailableAiPlayer()` ищет свободного бота и, если такого нет, создает нового `dino_ai_N`.
+- Не матчь игрока напрямую с фиксированным `dino_ai`: бери бота только через `AiPlayerService`.
+- Timeout fallback в очереди хранится в Redis через `dino:queue:waiting:<playerId>`. Не ломай этот ключ, если меняешь матчмейкинг.
 - Rename flow колоды идет через `src/bot/middleware/pendingTextActions.ts`.
 - Не вешай локальный `bot.on('message:text')` в handler-файлах: так легко сломать `/play` и `/battle`.
 - Если pending action не найден, middleware обязан делать `next()`.
@@ -103,6 +119,10 @@ Redis key для rename:
 - Использовать `Card.id` там, где остальной код ждет `slug`.
 - Забыть, что состав колоды хранится в `DeckCard`, а не в `Deck`.
 - Забыть обновить `BattleService` после изменений выбора колоды.
+- Запустить только `npm run dev` и забыть, что для AI нужен отдельный `npm run ai:worker`.
+- Пытаться вызвать AI синхронно из handler вместо Redis job.
+- Матчить всех с одним и тем же bot player вместо `AiPlayerService.ensureAvailableAiPlayer()`.
+- Сломать wait timestamp в `MatchmakingQueue` и получить fallback к AI не по timeout или не по голове очереди.
 - Обновить deck UI только в одном месте и оставить клавиатуру/рендер/handler рассинхроненными.
 - Проглотить команды через неверный text middleware.
 - Использовать в UI лимит вида `x/20` как факт: сейчас такого ограничения в коде нет.

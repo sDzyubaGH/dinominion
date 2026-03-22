@@ -1,60 +1,41 @@
 import { Bot } from 'grammy';
 import { env } from '../config/env.js';
-import { BattleService } from '../app/services/battleService.js';
-import { CardCatalogService } from '../app/services/cardCatalogService.js';
-import { DeckService } from '../app/services/deckService.js';
-import { MatchmakingService } from '../app/services/matchmakingService.js';
-import { PlayerService } from '../app/services/playerService.js';
+import { createServices } from '../app/createServices.js';
+import { BattleViewService } from '../app/services/battleViewService.js';
 import { registerBattleHandler } from './handlers/battle.js';
 import { registerDeckHandler } from './handlers/deck.js';
 import { registerPlayHandler } from './handlers/play.js';
 import { registerProfileHandler } from './handlers/profile.js';
 import { registerStartHandler } from './handlers/start.js';
 import { createPendingTextActionsMiddleware } from './middleware/pendingTextActions.js';
-import { BattleRepository } from '../infra/prisma/repositories/battleRepository.js';
-import { CardRepository } from '../infra/prisma/repositories/cardRepository.js';
-import { DeckRepository } from '../infra/prisma/repositories/deckRepository.js';
-import { PlayerCardRepository } from '../infra/prisma/repositories/playerCardRepository.js';
-import { PlayerRepository } from '../infra/prisma/repositories/playerRepository.js';
-import { redis } from '../infra/redis/redis.js';
-import { MatchmakingQueue } from '../infra/redis/queue.js';
-import { RedisLockService } from '../infra/redis/locks.js';
-import { CollectionService } from '../app/services/collectionService.js';
 
 const bot = new Bot(env.botToken);
-
-const playerRepository = new PlayerRepository();
-const deckRepository = new DeckRepository();
-const battleRepository = new BattleRepository();
-const cardRepository = new CardRepository();
-const playerCardRepository = new PlayerCardRepository();
-const cardCatalogService = new CardCatalogService(cardRepository);
-const collectionService = new CollectionService(playerCardRepository, cardRepository);
-const deckService = new DeckService(deckRepository, cardCatalogService, collectionService);
-const playerService = new PlayerService(playerRepository, collectionService, deckService);
-const lockService = new RedisLockService(redis);
-const battleService = new BattleService(
-	battleRepository,
-	playerRepository,
-	deckRepository,
-	redis,
-	lockService,
-	cardCatalogService
-);
-const matchmakingQueue = new MatchmakingQueue(redis, lockService);
-const matchmakingService = new MatchmakingService(
-	matchmakingQueue,
-	playerRepository,
-	battleService
+const services = createServices();
+const battleViewService = new BattleViewService(
+	bot.api,
+	services.cardCatalogService,
+	services.battleService
 );
 
-bot.use(createPendingTextActionsMiddleware(playerService, deckService));
+bot.use(createPendingTextActionsMiddleware(services.playerService, services.deckService));
 
-registerStartHandler(bot, playerService);
-registerProfileHandler(bot, playerService);
-registerDeckHandler(bot, playerService, deckService, cardCatalogService);
-registerPlayHandler(bot, playerService, cardCatalogService, matchmakingService, battleService);
-registerBattleHandler(bot, playerService, cardCatalogService, battleService);
+registerStartHandler(bot, services.playerService);
+registerProfileHandler(bot, services.playerService);
+registerDeckHandler(bot, services.playerService, services.deckService, services.cardCatalogService);
+registerPlayHandler(
+	bot,
+	services.playerService,
+	services.matchmakingService,
+	services.battleService,
+	battleViewService
+);
+registerBattleHandler(
+	bot,
+	services.playerService,
+	services.cardCatalogService,
+	services.battleService,
+	battleViewService
+);
 
 bot.catch((error) => {
 	console.error('Bot error', error.error);
