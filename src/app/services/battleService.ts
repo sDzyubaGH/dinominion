@@ -7,6 +7,7 @@ import { BattleRepository } from '../../infra/prisma/repositories/battleReposito
 import { DeckRepository } from '../../infra/prisma/repositories/deckRepository.js';
 import { PlayerRepository } from '../../infra/prisma/repositories/playerRepository.js';
 import { RedisLockService } from '../../infra/redis/locks.js';
+import { AiTurnQueue } from '../../infra/redis/aiQueue.js';
 import { CardCatalogService } from './cardCatalogService.js';
 
 export interface BattleSnapshot {
@@ -44,7 +45,8 @@ export class BattleService {
 		private readonly deckRepository: DeckRepository,
 		private readonly redis: Redis,
 		private readonly lockService: RedisLockService,
-		private readonly cardCatalogService: CardCatalogService
+		private readonly cardCatalogService: CardCatalogService,
+		private readonly aiTurnQueue: AiTurnQueue
 	) {}
 
 	async createBattle(player1: Player, player2: Player): Promise<BattleSnapshot> {
@@ -82,6 +84,7 @@ export class BattleService {
 		await this.cacheState(battle.id, state);
 		await this.redis.set(this.activeBattleKey(player1.id), String(battle.id));
 		await this.redis.set(this.activeBattleKey(player2.id), String(battle.id));
+		await this.scheduleAiTurnIfNeeded(state);
 
 		return {
 			battle: persistedBattle,
@@ -138,6 +141,31 @@ export class BattleService {
 			throw new Error('Player not registered.');
 		}
 
+		return this.applyActionForPlayer({
+			battleId: params.battleId,
+			playerId: actor.id,
+			action: params.action
+		});
+	}
+
+	async applyActionForPlayerId(params: {
+		battleId: number;
+		playerId: number;
+		action: BattleActionInput;
+	}): Promise<{ snapshot: BattleSnapshot; actor: Player }> {
+		return this.applyActionForPlayer(params);
+	}
+
+	private async applyActionForPlayer(params: {
+		battleId: number;
+		playerId: number;
+		action: BattleActionInput;
+	}): Promise<{ snapshot: BattleSnapshot; actor: Player }> {
+		const actor = await this.playerRepository.findById(params.playerId);
+		if (!actor) {
+			throw new Error('Player not registered.');
+		}
+
 		return this.lockService.withLock(this.battleLockKey(params.battleId), 5000, async () => {
 			const snapshot = await this.getBattleSnapshotById(params.battleId);
 			if (!snapshot) {
@@ -166,6 +194,7 @@ export class BattleService {
 				result.state
 			);
 			await this.cacheState(snapshot.battle.id, result.state);
+			await this.scheduleAiTurnIfNeeded(result.state);
 
 			if (result.state.status === 'finished') {
 				await this.redis.del(this.activeBattleKey(snapshot.player1.id));
@@ -181,6 +210,19 @@ export class BattleService {
 				}
 			};
 		});
+	}
+
+	private async scheduleAiTurnIfNeeded(state: BattleState): Promise<void> {
+		if (state.status !== 'active') {
+			return;
+		}
+
+		const currentPlayer = await this.playerRepository.findById(state.currentPlayerId);
+		if (!currentPlayer?.isBot) {
+			return;
+		}
+
+		await this.aiTurnQueue.enqueueTurn(state.battleId);
 	}
 
 	async storeBattleMessageRef(

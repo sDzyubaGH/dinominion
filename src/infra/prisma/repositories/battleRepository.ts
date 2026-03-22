@@ -37,6 +37,20 @@ export class BattleRepository {
 		});
 	}
 
+	async hasActiveBattle(playerId: number): Promise<boolean> {
+		const battle = await prisma.battle.findFirst({
+			where: {
+				status: BattleStatus.ACTIVE,
+				OR: [{ player1Id: playerId }, { player2Id: playerId }]
+			},
+			select: {
+				id: true
+			}
+		});
+
+		return Boolean(battle);
+	}
+
 	async saveState(id: number, state: BattleState): Promise<Battle> {
 		return prisma.battle.update({
 			where: { id },

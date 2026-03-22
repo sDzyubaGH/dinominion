@@ -1,17 +1,15 @@
 import type { Bot, Context } from 'grammy';
 import type { BattleService } from '../../app/services/battleService.js';
-import type { CardCatalogService } from '../../app/services/cardCatalogService.js';
+import type { BattleViewService } from '../../app/services/battleViewService.js';
 import type { MatchmakingService } from '../../app/services/matchmakingService.js';
 import type { PlayerService } from '../../app/services/playerService.js';
-import { createBattleKeyboard } from '../keyboards/battleKeyboard.js';
-import { renderBattleText } from '../../infra/telegram/renderer.js';
 
 export function registerPlayHandler(
 	bot: Bot<Context>,
 	playerService: PlayerService,
-	cardCatalogService: CardCatalogService,
 	matchmakingService: MatchmakingService,
-	battleService: BattleService
+	battleService: BattleService,
+	battleViewService: BattleViewService
 ): void {
 	bot.command('play', async (ctx) => {
 		if (!ctx.from) {
@@ -32,35 +30,7 @@ export function registerPlayHandler(
 			return;
 		}
 
-		const snapshot = await battleService.getBattleSnapshotById(result.battleId);
-		if (!snapshot) {
-			throw new Error('Created battle could not be loaded.');
-		}
-
-		const cardLookup = await cardCatalogService.getLookupForBattleState(snapshot.state);
-		for (const targetPlayer of [snapshot.player1, snapshot.player2]) {
-			const sentMessage = await bot.api.sendMessage(
-				Number(targetPlayer.telegramId),
-				renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup),
-				{
-					reply_markup: createBattleKeyboard(
-						snapshot.state,
-						targetPlayer.id,
-						{
-							type: 'default'
-						},
-						cardLookup
-					)
-				}
-			);
-
-			await battleService.storeBattleMessageRef(
-				snapshot.battle.id,
-				targetPlayer.id,
-				targetPlayer.telegramId.toString(),
-				String(sentMessage.message_id)
-			);
-		}
+		await battleViewService.sendInitialBattleMessages(result.battleId);
 
 		await ctx.reply('Матч найден. Сообщения о бое отправлены обоим игрокам.');
 	});

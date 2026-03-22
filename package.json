@@ -5,6 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "tsx src/bot/index.ts",
+		"ai:worker": "tsx src/workers/aiWorker.ts",
 		"build": "tsc -p tsconfig.json",
 		"start": "node dist/src/bot/index.js",
 		"test": "node --import tsx --test src/tests/core/engine/*.test.ts",

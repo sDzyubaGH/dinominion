@@ -14,11 +14,33 @@ export class PlayerRepository {
 		});
 	}
 
-	async create(data: { telegramId: bigint; username?: string | null }): Promise<Player> {
+	async findByUsername(username: string): Promise<Player | null> {
+		return prisma.player.findFirst({
+			where: { username }
+		});
+	}
+
+	async findManyBots(): Promise<Player[]> {
+		return prisma.player.findMany({
+			where: {
+				isBot: true
+			},
+			orderBy: {
+				id: 'asc'
+			}
+		});
+	}
+
+	async create(data: {
+		telegramId: bigint;
+		username?: string | null;
+		isBot?: boolean;
+	}): Promise<Player> {
 		return prisma.player.create({
 			data: {
 				telegramId: data.telegramId,
-				username: data.username ?? null
+				username: data.username ?? null,
+				isBot: data.isBot ?? false
 			}
 		});
 	}
