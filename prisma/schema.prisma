@@ -18,8 +18,12 @@ enum CardType {
 }
 
 enum EffectType {
+	DAMAGE_UNIT
 	GUARD_PASSIVE
 	PACK_ATTACK
+	HATCH_ACCELERATE
+	HEAL_HERO
+	DRAW_CARD
 	HATCH
 	EVOLVE
 	BUFF_ATTACK
@@ -35,6 +39,7 @@ enum TriggerType {
 
 enum TargetType {
 	SELF
+	ALLY_HERO
 	ALLY_UNIT
 	ENEMY_UNIT
 	ENEMY_HERO

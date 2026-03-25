@@ -181,6 +181,38 @@ export function registerBattleHandler(
 			return;
 		}
 
+		if (parsed.command === 'play_target_select' && parsed.cardInstanceId) {
+			await renderView(
+				ctx,
+				snapshot,
+				actor.id,
+				{ type: 'play_targets', cardInstanceId: parsed.cardInstanceId },
+				cardLookup
+			);
+			return;
+		}
+
+		if (parsed.command === 'play_target_unit' && parsed.cardInstanceId && parsed.targetUnitId) {
+			try {
+				await battleService.applyActionForTelegramId({
+					battleId: snapshot.battle.id,
+					telegramId: BigInt(ctx.from.id),
+					action: {
+						type: 'play_card',
+						cardInstanceId: parsed.cardInstanceId,
+						target: { type: 'unit', unitId: parsed.targetUnitId }
+					}
+				});
+				await battleViewService.refreshBattleViews(snapshot.battle.id);
+				await ctx.answerCallbackQuery({ text: 'Карта разыграна.' });
+			} catch (error) {
+				await ctx.answerCallbackQuery({
+					text: error instanceof Error ? error.message : 'Не удалось разыграть карту.'
+				});
+			}
+			return;
+		}
+
 		await ctx.answerCallbackQuery({ text: 'Неизвестное действие.' });
 	});
 }
@@ -199,14 +231,17 @@ async function renderView(
 				)
 			: undefined;
 	const text =
-		mode.type === 'hand'
-			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderHandText(snapshot.state, viewerId, cardLookup)}`
-			: mode.type === 'attackers'
-				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderActionSummary(snapshot.state, viewerId, cardLookup)}`
-				: mode.type === 'targets'
-					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для ${attackerName ? cardLookup(attackerName.cardId).name : mode.attackerId}.`
+	mode.type === 'hand'
+		? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderHandText(snapshot.state, viewerId, cardLookup)}`
+		: mode.type === 'attackers'
+			? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderActionSummary(snapshot.state, viewerId, cardLookup)}`
+			: mode.type === 'targets'
+				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для ${attackerName ? cardLookup(attackerName.cardId).name : mode.attackerId}.`
+				: mode.type === 'play_targets'
+					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для карты.`
 					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup);
 
+				
 	await ctx.editMessageText(text, {
 		reply_markup: createBattleKeyboard(snapshot.state, viewerId, mode, cardLookup)
 	});
@@ -218,7 +253,9 @@ type ParsedBattleCallback =
 	| { battleId?: number; command: 'attacker'; attackerId: number }
 	| { battleId?: number; command: 'play'; cardInstanceId: number }
 	| { battleId?: number; command: 'target_hero'; attackerId: number }
-	| { battleId?: number; command: 'target_unit'; attackerId: number; targetUnitId: number };
+	| { battleId?: number; command: 'target_unit'; attackerId: number; targetUnitId: number }
+	| { battleId?: number; command: 'play_target_select'; cardInstanceId: number }
+	| { battleId?: number; command: 'play_target_unit'; cardInstanceId: number; targetUnitId: number };
 
 function parseBattleCallbackData(data: string): ParsedBattleCallback {
 	const parts = data.split(':');

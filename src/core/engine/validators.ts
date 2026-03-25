@@ -34,6 +34,25 @@ export function validateAction(
 		if (player.board.length >= MAX_BOARD_SIZE) {
 			return 'Поле заполнено.';
 		}
+
+		const needsEnemyUnitTarget = (definition.abilities ?? []).some(
+			(ability) => ability.type === 'damage_enemy_unit_on_play'
+		);
+
+		if (needsEnemyUnitTarget) {
+			if (!action.target || action.target.type !== 'unit') {
+				return 'Нужно выбрать вражеское существо для эффекта карты.'
+			}
+
+			const targetUnitId = action.target.unitId
+			const opponent = getOpponent(state, action.playerId);
+			const targetExists = opponent.board.some((unit) => unit.instanceId === targetUnitId);
+			if (!targetExists) {
+				return 'Выбранная цель недоступна.';
+			}
+		} else if (action.target) {
+			return 'Эта карта не требует выбора цели.';
+		}
 	}
 
 	if (action.type === 'attack') {

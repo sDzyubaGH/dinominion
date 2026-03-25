@@ -63,3 +63,123 @@ test('validateAction rejects attacking the hero while a guard unit is on the boa
 
 	assert.equal(error, 'Сначала нужно атаковать существ с охраной.');
 });
+
+test('validateAction rejects damage-on-play card without target', () => {
+	const state = createTestBattleState({
+		player1Deck: ['venom-spitter', 'marsh-hunter', 'swamp-hatchling', 'forest-raptor'],
+		player2Deck: ['horned-guardian', 'ridge-triceratops', 'marsh-hunter', 'cliff-stalker']
+	});
+	state.players[1].maxEnergy = 10;
+	state.players[1].energy = 10;
+	state.players[2].board = [
+		{ instanceId: 201, cardId: 'horned-guardian', ownerId: 2, damageTaken: 0, canAttack: false }
+	];
+
+	const cardInstanceId = findHandCardInstanceId(state, 1, 'venom-spitter');
+	const error = validateAction(
+		state,
+		{ type: 'play_card', playerId: 1, cardInstanceId },
+		testCardLookup
+	);
+
+	assert.equal(error, 'Нужно выбрать вражеское существо для эффекта карты.');
+});
+
+test('validateAction rejects damage-on-play card with hero target', () => {
+	const state = createTestBattleState({
+		player1Deck: ['venom-spitter', 'marsh-hunter', 'swamp-hatchling', 'forest-raptor'],
+		player2Deck: ['horned-guardian', 'ridge-triceratops', 'marsh-hunter', 'cliff-stalker']
+	});
+	state.players[1].maxEnergy = 10;
+	state.players[1].energy = 10;
+	state.players[2].board = [
+		{ instanceId: 201, cardId: 'horned-guardian', ownerId: 2, damageTaken: 0, canAttack: false }
+	];
+
+	const cardInstanceId = findHandCardInstanceId(state, 1, 'venom-spitter');
+	const error = validateAction(
+		state,
+		{
+			type: 'play_card',
+			playerId: 1,
+			cardInstanceId,
+			target: { type: 'hero' }
+		},
+		testCardLookup
+	);
+
+	assert.equal(error, 'Нужно выбрать вражеское существо для эффекта карты.');
+});
+
+test('validateAction rejects damage-on-play card with missing enemy target unit', () => {
+	const state = createTestBattleState({
+		player1Deck: ['venom-spitter', 'marsh-hunter', 'swamp-hatchling', 'forest-raptor'],
+		player2Deck: ['horned-guardian', 'ridge-triceratops', 'marsh-hunter', 'cliff-stalker']
+	});
+	state.players[1].maxEnergy = 10;
+	state.players[1].energy = 10;
+	state.players[2].board = [];
+
+	const cardInstanceId = findHandCardInstanceId(state, 1, 'venom-spitter');
+	const error = validateAction(
+		state,
+		{
+			type: 'play_card',
+			playerId: 1,
+			cardInstanceId,
+			target: { type: 'unit', unitId: 9999 }
+		},
+		testCardLookup
+	);
+
+	assert.equal(error, 'Выбранная цель недоступна.');
+});
+
+test('validateAction accepts damage-on-play card with valid enemy unit target', () => {
+	const state = createTestBattleState({
+		player1Deck: ['venom-spitter', 'marsh-hunter', 'swamp-hatchling', 'forest-raptor'],
+		player2Deck: ['horned-guardian', 'ridge-triceratops', 'marsh-hunter', 'cliff-stalker']
+	});
+	state.players[1].maxEnergy = 10;
+	state.players[1].energy = 10;
+	state.players[2].board = [
+		{ instanceId: 201, cardId: 'horned-guardian', ownerId: 2, damageTaken: 0, canAttack: false }
+	];
+
+	const cardInstanceId = findHandCardInstanceId(state, 1, 'venom-spitter');
+	const error = validateAction(
+		state,
+		{
+			type: 'play_card',
+			playerId: 1,
+			cardInstanceId,
+			target: { type: 'unit', unitId: 201 }
+		},
+		testCardLookup
+	);
+
+	assert.equal(error, null);
+});
+
+test('validateAction rejects extra target for non-targeted play card', () => {
+	const state = createTestBattleState({
+		player1Deck: ['marsh-hunter', 'forest-raptor', 'swamp-hatchling', 'ancient-egg'],
+		player2Deck: ['horned-guardian', 'ridge-triceratops', 'marsh-hunter', 'cliff-stalker']
+	});
+	state.players[1].maxEnergy = 10;
+	state.players[1].energy = 10;
+
+	const cardInstanceId = findHandCardInstanceId(state, 1, 'marsh-hunter');
+	const error = validateAction(
+		state,
+		{
+			type: 'play_card',
+			playerId: 1,
+			cardInstanceId,
+			target: { type: 'unit', unitId: 201 }
+		},
+		testCardLookup
+	);
+
+	assert.equal(error, 'Эта карта не требует выбора цели.');
+});

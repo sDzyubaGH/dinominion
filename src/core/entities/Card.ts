@@ -12,7 +12,24 @@ export type CardAbility =
 			type: 'hatch';
 			into: string;
 			afterOwnerTurns: number;
-	  };
+	  }
+	| {
+			type: 'hatch_accelerate_on_play';
+			amount: number;
+			selection: 'all' | 'lowest_timer';
+	  }
+	| {
+		type: 'draw_on_play';
+		count: number;
+	  }
+	| {
+		type: 'heal_hero_on_play';
+		amount: number;
+	  }
+	| {
+		type: 'damage_enemy_unit_on_play';
+		amount: number;
+	};
 
 export interface CardDefinition {
 	id: string;

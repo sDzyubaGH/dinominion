@@ -21,6 +21,12 @@ export type BattleActionInput =
 	| {
 			type: 'play_card';
 			cardInstanceId: number;
+			target?:
+				| { type: 'hero' }
+				| {
+						type: 'unit';
+						unitId: number;
+				  };
 	  }
 	| {
 			type: 'attack';

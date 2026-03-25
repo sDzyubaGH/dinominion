@@ -16,6 +16,10 @@ export type BattleViewMode =
 	| {
 			type: 'targets';
 			attackerId: number;
+	  }
+	| {
+			type: 'play_targets';
+			cardInstanceId: number;
 	  };
 
 export function createBattleKeyboard(
@@ -28,11 +32,19 @@ export function createBattleKeyboard(
 	const isCurrentPlayer = state.currentPlayerId === viewerId && state.status === 'active';
 
 	if (mode.type === 'hand') {
+		
 		const player = state.players[viewerId];
 		if (isCurrentPlayer) {
 			for (const card of player?.hand ?? []) {
+				const actions = getAvailableActions(state, viewerId, cardLookup);
+				const targetsForCard = actions.targetsByPlayableCardId[card.instanceId] ?? [];
+				const isTargetedPlay = targetsForCard.length > 0;
 				const definition = cardLookup(card.cardId);
-				keyboard.text(`${definition.name} (${definition.cost})`, `b:p:${card.instanceId}`).row();
+				keyboard
+					.text(
+						`${definition.name} (${definition.cost})`,
+						isTargetedPlay ? `b:pt:${card.instanceId}` : `b:p:${card.instanceId}`
+					).row();
 			}
 		}
 		return keyboard.text('Назад', 'b:b');
@@ -82,6 +94,30 @@ export function createBattleKeyboard(
 		}
 
 		return keyboard.text('Назад', 'b:a');
+	}
+
+	if (mode.type === 'play_targets') {
+		if (!isCurrentPlayer) {
+			return keyboard.text('Назад', 'b:h');
+		}
+	
+		const actions = getAvailableActions(state, viewerId, cardLookup);
+		const targets = actions.targetsByPlayableCardId[mode.cardInstanceId] ?? [];
+	
+		for (const target of targets) {
+			if (target.type === 'unit') {
+				const opponentId = Object.keys(state.players).find((id) => Number(id) !== viewerId);
+				const opponentBoard = opponentId ? state.players[Number(opponentId)].board : [];
+				const unit = opponentBoard.find((u) => u.instanceId === target.unitId);
+				if (!unit) continue;
+	
+				keyboard
+					.text(cardLookup(unit.cardId).name, `b:pu:${mode.cardInstanceId}:${unit.instanceId}`)
+					.row();
+			}
+		}
+	
+		return keyboard.text('Назад', 'b:h');
 	}
 
 	keyboard.text('Посмотреть руку', 'b:h').row();

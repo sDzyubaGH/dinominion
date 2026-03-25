@@ -64,6 +64,21 @@ async function main(): Promise<void> {
 				continue;
 			}
 
+			if (ability.type == 'hatch_accelerate_on_play') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'HATCH_ACCELERATE',
+					triggerType: 'ON_PLAY',
+					targetType: 'ALLY_UNIT',
+					value: ability.amount,
+					sortOrder: effects.length,
+					params: {
+						selection: ability.selection
+					}
+				});
+				continue;
+			}
+
 			if (ability.type === 'hatch') {
 				effects.push({
 					cardId: persistedCard.id,
@@ -76,7 +91,45 @@ async function main(): Promise<void> {
 						intoSlug: ability.into
 					}
 				});
+				continue;
 			}
+
+			if (ability.type === 'draw_on_play') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'DRAW_CARD',
+					triggerType: 'ON_PLAY',
+					targetType: 'SELF',
+					value: ability.count,
+					sortOrder: effects.length,
+				});
+				continue;
+			}
+
+			if (ability.type === 'heal_hero_on_play') {
+				effects.push({
+					cardId: persistedCard.id,
+					effectType: 'HEAL_HERO',
+					triggerType: 'ON_PLAY',
+					targetType: 'ALLY_HERO',
+					value: ability.amount,
+					sortOrder: effects.length,
+				});
+				continue;
+			}
+
+			if (ability.type === 'damage_enemy_unit_on_play') {
+				effects.push({
+					cardId:persistedCard.id,
+					effectType: 'DAMAGE_UNIT',
+					triggerType: 'ON_PLAY',
+					targetType: 'ENEMY_UNIT',
+					value: ability.amount,
+					sortOrder: effects.length,
+				});
+				continue;
+			}
+
 		}
 
 		if (effects.length > 0) {

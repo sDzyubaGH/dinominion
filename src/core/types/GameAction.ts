@@ -3,6 +3,12 @@ export type GameAction =
 			type: 'play_card';
 			playerId: number;
 			cardInstanceId: number;
+			target?:
+				| { type: 'hero' }
+				| { 
+					type: 'unit';
+					unitId: number;
+				  };
 	  }
 	| {
 			type: 'attack';

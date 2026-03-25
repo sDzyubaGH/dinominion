@@ -10,7 +10,6 @@ import {
 	hasAbility
 } from './rules.js';
 import { validateAction } from './validators.js';
-
 interface InitialBattleInput {
 	battleId: number;
 	player1Id: number;
@@ -61,7 +60,7 @@ export function applyAction(
 	const nextState = cloneState(state);
 
 	if (action.type === 'play_card') {
-		applyPlayCard(nextState, action.playerId, action.cardInstanceId, cardLookup);
+		applyPlayCard(nextState, action.playerId, action.cardInstanceId, cardLookup, action.target);
 	}
 
 	if (action.type === 'attack') {
@@ -100,6 +99,10 @@ export function getAvailableActions(
 ): {
 	canEndTurn: boolean;
 	playableCardIds: number[];
+	targetsByPlayableCardId: Record<
+		number,
+		Array<{ type: 'hero' } | { type: 'unit'; unitId: number }>
+	>;
 	attackers: number[];
 	targetsByAttacker: Record<number, Array<{ type: 'hero' } | { type: 'unit'; unitId: number }>>;
 } {
@@ -108,6 +111,7 @@ export function getAvailableActions(
 		return {
 			canEndTurn: false,
 			playableCardIds: [],
+			targetsByPlayableCardId: {},
 			attackers: [],
 			targetsByAttacker: {}
 		};
@@ -122,6 +126,33 @@ export function getAvailableActions(
 
 	const opponent = getOpponent(state, playerId);
 	const guards = opponent.board.filter((unit) => hasAbility(cardLookup(unit.cardId), 'guard'));
+
+	const targetsByPlayableCardId: Record<
+		number,
+		Array<{ type: 'hero' } | { type: 'unit'; unitId: number }>
+	  > = {};
+
+	  const playableCards = player.hand.filter((card) => {
+		const definition = cardLookup(card.cardId);
+		return definition.cost <= player.energy && player.board.length < 3;
+	});
+
+	  for (const handCard of playableCards) {
+		const definition = cardLookup(handCard.cardId);
+		const needsEnemyUnitTarget = (definition.abilities ?? []).some(
+			(ability) => ability.type === 'damage_enemy_unit_on_play'
+		);
+
+		if (!needsEnemyUnitTarget) {
+			continue;
+		}
+
+		targetsByPlayableCardId[handCard.instanceId] = opponent.board.map((unit) => ({
+			type: 'unit' as const,
+			unitId: unit.instanceId
+		}));
+	}
+
 	const attackers = player.board.filter((unit) => unit.canAttack).map((unit) => unit.instanceId);
 	const targetsByAttacker: Record<
 		number,
@@ -142,7 +173,8 @@ export function getAvailableActions(
 		canEndTurn: true,
 		playableCardIds,
 		attackers,
-		targetsByAttacker
+		targetsByAttacker,
+		targetsByPlayableCardId
 	};
 }
 
@@ -184,6 +216,8 @@ function resolveTurnEffects(
 	cardLookup: (cardId: string) => CardDefinition
 ): void {
 	const player = state.players[playerId];
+	const toHatch: Array<{ unitInstanceId: number; intoCardId: string }> = [];
+
 	player.board = player.board.map((unit) => {
 		const hatchEffect = unit.effects?.find((effect) => effect.type === 'hatch');
 		if (!hatchEffect) {
@@ -201,25 +235,24 @@ function resolveTurnEffects(
 			};
 		}
 
-		const hatchedDefinition = cardLookup(hatchEffect.into);
-		state.log.unshift(`${unit.instanceId} вылупляется в ${hatchedDefinition.name}.`);
-
-		return {
-			instanceId: unit.instanceId,
-			cardId: hatchEffect.into,
-			ownerId: unit.ownerId,
-			damageTaken: 0,
-			canAttack: false,
-			effects: createInitialEffects(hatchedDefinition)
-		};
+		toHatch.push({
+			unitInstanceId: unit.instanceId,
+			intoCardId: hatchEffect.into
+		});
+		return unit;
 	});
+
+	for (const target of toHatch) {
+		hatchUnitNow(state, playerId, target.unitInstanceId, target.intoCardId, cardLookup);
+	}
 }
 
 function applyPlayCard(
 	state: BattleState,
 	playerId: number,
 	cardInstanceId: number,
-	cardLookup: (cardId: string) => CardDefinition
+	cardLookup: (cardId: string) => CardDefinition,
+	target?: { type: 'hero' } | { type: 'unit'; unitId: number }
 ): void {
 	const player = state.players[playerId];
 	const cardIndex = player.hand.findIndex((card) => card.instanceId === cardInstanceId);
@@ -229,7 +262,187 @@ function applyPlayCard(
 	player.energy -= definition.cost;
 	player.hand.splice(cardIndex, 1);
 	player.board.push(toUnit(handCard, playerId, definition));
+	resolveOnPlayEffects(state, playerId, handCard.instanceId, definition, cardLookup, target);
 	state.log.unshift(`Игрок ${playerId} разыграл ${definition.name}.`);
+}
+
+function resolveOnPlayEffects(
+	state: BattleState,
+	playerId: number,
+	playedUnitInstanceId: number,
+	definition: CardDefinition,
+	cardLookup: (cardId: string) => CardDefinition,
+	target?: { type: 'hero' } | { type: 'unit'; unitId: number }
+): void {
+	for (const ability of definition.abilities ?? []) {
+		if (ability.type === 'hatch_accelerate_on_play') {
+			applyHatchAccelerateOnPlay(
+				state,
+				playerId,
+				playedUnitInstanceId,
+				ability.amount,
+				ability.selection,
+				cardLookup
+			);
+			continue;
+		}
+
+		if (ability.type === 'draw_on_play'){
+			drawCards(state, playerId, ability.count);
+			state.log.unshift(`Игрок ${playerId} берет ${ability.count} карту(ы)`);
+			continue;
+		}
+
+		if (ability.type === 'heal_hero_on_play') {
+			applyHealHeroOnPlay(state, playerId, ability.amount);
+			continue;
+		}
+
+		if (ability.type === 'damage_enemy_unit_on_play') {
+			applyDamageEnemyUnitOnPlay(state, playerId, ability.amount, target, cardLookup);
+			continue;
+		}
+	}
+}
+
+function applyDamageEnemyUnitOnPlay(
+	state: BattleState,
+	playerId: number,
+	amount: number,
+	target: { type: 'hero' } | { type: 'unit'; unitId: number } | undefined,
+	cardLookup: (cardId: string) => CardDefinition
+): void {
+	if (!target || target.type !== 'unit') {
+		return;
+	}
+
+	const opponent = getOpponent(state, playerId);
+	const enemy = opponent.board.find((unit) => unit.instanceId === target.unitId);
+	if (!enemy) {
+		return;
+	}
+
+	enemy.damageTaken += amount;
+	state.log.unshift(`Игрок ${playerId} наносит ${amount} урона существу ${enemy.instanceId}.`);
+
+	removeDeadUnits(state, cardLookup)
+	checkWinner(state);
+}
+
+function applyHealHeroOnPlay(
+	state: BattleState,
+	playerId: number,
+	amount: number
+): void {
+	const player = state.players[playerId];
+	const before = player.health
+	player.health = Math.min(STARTING_HEALTH, player.health + amount)
+	const healed = player.health - before;
+
+	if (healed > 0) {
+		state.log.unshift(`Игрок ${playerId} восстанавливает ${healed} здаровье герою.`);
+	}
+}
+
+function applyHatchAccelerateOnPlay(
+	state: BattleState,
+	playerId: number,
+	playedUnitInstanceId: number,
+	amount: number,
+	selection: 'all' | 'lowest_timer',
+	cardLookup: (cardId: string) => CardDefinition
+): void {
+	const player = state.players[playerId];
+
+	const hatchTargets = player.board
+		.filter((unit) => unit.instanceId !== playedUnitInstanceId)
+		.map((unit) => {
+			const hatchEffect = unit.effects?.find((effect) => effect.type === 'hatch');
+			if (!hatchEffect) {
+				return null;
+			}
+			return {
+				unitInstanceId: unit.instanceId,
+				intoCardId: hatchEffect.into,
+				turnsRemaining: hatchEffect.turnsRemaining
+			};
+		})
+		.filter(
+			(
+				item
+			): item is { unitInstanceId: number; intoCardId: string; turnsRemaining: number } =>
+				item !== null
+		);
+
+	if (hatchTargets.length === 0) {
+		return;
+	}
+
+	const selectedTargets =
+		selection === 'lowest_timer'
+			? [
+					hatchTargets.reduce((best, current) =>
+						current.turnsRemaining < best.turnsRemaining ? current : best
+					)
+			  ]
+			: hatchTargets;
+
+	for (const target of selectedTargets) {
+		const unit = player.board.find((item) => item.instanceId === target.unitInstanceId);
+		if (!unit) {
+			continue;
+		}
+
+		const hatchEffect = unit.effects?.find((effect) => effect.type === 'hatch');
+		if (!hatchEffect) {
+			continue;
+		}
+
+		const nextTurnsRemaining = Math.max(0, hatchEffect.turnsRemaining - amount);
+		if (nextTurnsRemaining > 0) {
+			unit.effects = updateEffect(unit.effects ?? [], {
+				...hatchEffect,
+				turnsRemaining: nextTurnsRemaining
+			});
+			state.log.unshift(
+				`Эффект ускорения: яйцо ${unit.instanceId} вылупится через ${nextTurnsRemaining}.`
+			);
+			continue;
+		}
+
+		hatchUnitNow(state, playerId, unit.instanceId, hatchEffect.into, cardLookup);
+	}
+}
+
+function hatchUnitNow(
+	state: BattleState,
+	playerId: number,
+	unitInstanceId: number,
+	intoCardId: string,
+	cardLookup: (cardId: string) => CardDefinition
+): void {
+	const player = state.players[playerId];
+	const unitIndex = player.board.findIndex((unit) => unit.instanceId === unitInstanceId);
+	if (unitIndex < 0) {
+		return;
+	}
+
+	const currentUnit = player.board[unitIndex];
+	if (!currentUnit) {
+		return;
+	}
+
+	const hatchedDefinition = cardLookup(intoCardId);
+	state.log.unshift(`${currentUnit.instanceId} вылупляется в ${hatchedDefinition.name}.`);
+
+	player.board[unitIndex] = {
+		instanceId: currentUnit.instanceId,
+		cardId: intoCardId,
+		ownerId: currentUnit.ownerId,
+		damageTaken: 0,
+		canAttack: false,
+		effects: createInitialEffects(hatchedDefinition)
+	};
 }
 
 function applyAttack(

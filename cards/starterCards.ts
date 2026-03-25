@@ -232,7 +232,68 @@ export const STARTER_CARDS: CardDefinition[] = [
 		attack: 5,
 		health: 5,
 		species: 'Ceratops'
-	}
+	},
+	{
+		id: 'nest-tender',
+		name: 'Наседка гнезда',
+		cost: 2,
+		attack: 1,
+		health: 3,
+		species: 'Brood',
+		abilityText: 'Наседка: уменьшает время вылупления вашего яйца на 1',
+		abilities: [
+			{
+				type: 'hatch_accelerate_on_play',
+				amount: 1,
+				selection: 'all'
+			}
+		]
+	},
+	{
+		id: 'battle-scout',
+		name: 'Боевой Разведчик',
+		cost: 2,
+		attack: 2,
+		health: 1,
+		species: 'Raptor',
+		abilityText: 'При розыгрыше: взять 1 карту',
+		abilities: [
+			{
+				type: 'draw_on_play',
+				count: 1,
+			}
+		]
+	},
+	{
+		id: 'hippocratosaurus',
+		name: 'Гиппократозавр',
+		cost: 3,
+		attack: 2,
+		health: 3,
+		species: 'Support',
+		abilityText: 'При розыгрыше: восстановить 3 здоровья вашему герою.',
+		abilities: [
+			{
+				type: 'heal_hero_on_play',
+				amount: 3,
+			}
+		]
+	},
+	{
+		id: 'venom-spitter',
+		name: 'Ядоплюй',
+		cost: 3,
+		attack: 3,
+		health: 2,
+		species: 'dilophosaurus',
+		abilityText: 'При розыгрыше: нанести 2 урона вражескому существу',
+		abilities: [
+		  {
+			type: 'damage_enemy_unit_on_play',
+			amount: 2,
+		  }
+		]
+	  }
 ];
 
 export const STARTER_DECKS: StarterDeckDefinition[] = [
@@ -278,7 +339,7 @@ export const STARTER_DECKS: StarterDeckDefinition[] = [
 		cardIds: [
 			'nursery-egg',
 			'nursery-egg',
-			'ancient-egg',
+			'nest-tender',
 			'ancient-egg',
 			'ancient-nest-egg',
 			'ancient-nest-egg',

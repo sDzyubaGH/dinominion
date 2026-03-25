@@ -122,6 +122,45 @@ function toAbilities(card: CardWithEffects): CardAbility[] | undefined {
 			continue;
 		}
 
+		if (effect.effectType === 'HATCH_ACCELERATE') {
+			const params = getObject(effect.params);
+
+			const rawSelection =  readString(params, 'selection')
+			const selection = 
+				rawSelection === 'lowest_timer' || rawSelection === 'all'
+					? rawSelection
+					: 'all';
+			abilities.push({
+				type: 'hatch_accelerate_on_play',
+				amount: effect.value ?? 1,
+				selection
+			});
+			continue;
+		}
+
+		if (effect.effectType === 'DRAW_CARD') {
+			abilities.push({
+				type: 'draw_on_play',
+				count: effect.value ?? 1,
+			});
+			continue;
+		}
+
+		if (effect.effectType === 'HEAL_HERO') {
+			abilities.push({
+				type: 'heal_hero_on_play',
+				amount: effect.value ?? 1
+			});
+			continue;
+		}
+
+		if (effect.effectType === 'DAMAGE_UNIT') {
+			abilities.push({
+				type: 'heal_hero_on_play',
+				amount: effect.value ?? 1
+			})
+		}
+
 		if (effect.effectType === 'HATCH') {
 			const params = getObject(effect.params);
 			const into = readString(params, 'intoSlug') ?? readString(params, 'hatchesIntoCardId');
