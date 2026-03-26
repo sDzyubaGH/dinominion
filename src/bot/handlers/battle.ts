@@ -7,7 +7,8 @@ import { createBattleKeyboard, type BattleViewMode } from '../keyboards/battleKe
 import {
 	renderActionSummary,
 	renderBattleText,
-	renderHandText
+	renderHandText,
+	renderBattleLogPage
 } from '../../infra/telegram/renderer.js';
 
 export function registerBattleHandler(
@@ -213,6 +214,27 @@ export function registerBattleHandler(
 			return;
 		}
 
+		if (parsed.command === 'log') {
+			await renderView(ctx, snapshot, actor.id, { type: 'log', page: parsed.page }, cardLookup);
+			return;
+		}
+
+		if (parsed.command === 'log_prev') {
+			const prevPage = Math.max(0, parsed.page - 1);
+			await renderView(ctx, snapshot, actor.id, { type: 'log', page: prevPage }, cardLookup);
+			return;
+		}
+
+		if (parsed.command === 'log_next') {
+			const pageSize = 15;
+			const maxPage = Math.max(0, Math.ceil(snapshot.state.log.length / pageSize) - 1);
+			const nextPage = Math.min(maxPage, parsed.page + 1);
+
+			await renderView(ctx, snapshot, actor.id, { type: 'log', page: nextPage }, cardLookup);
+			return;
+		}
+
+
 		await ctx.answerCallbackQuery({ text: 'Неизвестное действие.' });
 	});
 }
@@ -239,7 +261,12 @@ async function renderView(
 				? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для ${attackerName ? cardLookup(attackerName.cardId).name : mode.attackerId}.`
 				: mode.type === 'play_targets'
 					? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\nВыберите цель для карты.`
-					: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup);
+					: mode.type === 'log'
+						? `${renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup)}\n\n${renderBattleLogPage(snapshot.state, mode.page, 15)}`
+						: renderBattleText(snapshot.state, snapshot.player1, snapshot.player2, cardLookup);
+
+					
+					
 
 				
 	await ctx.editMessageText(text, {
@@ -255,7 +282,11 @@ type ParsedBattleCallback =
 	| { battleId?: number; command: 'target_hero'; attackerId: number }
 	| { battleId?: number; command: 'target_unit'; attackerId: number; targetUnitId: number }
 	| { battleId?: number; command: 'play_target_select'; cardInstanceId: number }
-	| { battleId?: number; command: 'play_target_unit'; cardInstanceId: number; targetUnitId: number };
+	| { battleId?: number; command: 'play_target_unit'; cardInstanceId: number; targetUnitId: number }
+	| { battleId?: number; command: 'log'; page: number }
+	| { battleId?: number; command: 'log_prev'; page: number }
+	| { battleId?: number; command: 'log_next'; page: number };
+
 
 function parseBattleCallbackData(data: string): ParsedBattleCallback {
 	const parts = data.split(':');
@@ -284,6 +315,12 @@ function parseBattleCallbackData(data: string): ParsedBattleCallback {
 					attackerId: Number(parts[2]),
 					targetUnitId: Number(parts[3])
 				};
+			case 'l':
+				return { command: 'log', page: Number(parts[2] ?? 0) };
+			case 'lp':
+				return { command: 'log_prev', page: Number(parts[2] ?? 0) };
+			case 'ln':
+				return { command: 'log_next', page: Number(parts[2] ?? 0) };
 		}
 	}
 

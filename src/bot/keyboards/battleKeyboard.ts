@@ -20,7 +20,11 @@ export type BattleViewMode =
 	| {
 			type: 'play_targets';
 			cardInstanceId: number;
-	  };
+	  }
+	| {
+			type: 'log';
+			page: number;
+  	  };
 
 export function createBattleKeyboard(
 	state: BattleState,
@@ -120,7 +124,24 @@ export function createBattleKeyboard(
 		return keyboard.text('Назад', 'b:h');
 	}
 
+	if (mode.type === 'log') {
+		const totalEvents = state.log.length;
+		const pageSize = 15;
+		const totalPages = Math.max(1, Math.ceil(totalEvents / pageSize));
+		const page = Math.min(Math.max(0, mode.page), totalPages - 1);
+
+		if (page > 0) {
+			keyboard.text('⬅️', `b:lp:${page}`).row();
+		}
+		if (page < totalPages - 1) {
+			keyboard.text('➡️', `b:ln:${page}`).row();
+		}
+
+		return keyboard.text('Назад', 'b:b');
+	}
+
 	keyboard.text('Посмотреть руку', 'b:h').row();
+	keyboard.text('Ход боя', 'b:l:0').row();
 	if (isCurrentPlayer) {
 		keyboard.text('Атаковать', 'b:a').row();
 		keyboard.text('Завершить ход', 'b:e').row();

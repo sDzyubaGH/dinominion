@@ -8,6 +8,40 @@ function displayName(player: Player): string {
 	return player.username ? `@${player.username}` : `tg:${player.telegramId.toString()}`;
 }
 
+export function renderRecentEvents(state: BattleState, limit = 2): string {
+	const safeLimit = Math.max(1, limit)
+	const recent = state.log.slice(0, safeLimit);
+
+	if (recent.length === 0) {
+		return '• Бой начался.'
+	}
+
+	return recent.map((event) => `${event}`).join('\n')
+}
+
+export function renderBattleLogPage(state: BattleState, page: number, pageSize = 15): string {
+	const safePageSize = Math.max(1, pageSize);
+	const totalEvents = state.log.length;
+	const totalPages = Math.max(1, Math.ceil(totalEvents / safePageSize));
+	const safePage = Math.min(Math.max(0, page), totalPages - 1);
+
+	const start = safePage * safePageSize;
+	const end = start + safePageSize;
+	const events = state.log.slice(start, end);
+
+	const lines = ['Ход боя', `Страница ${safePage + 1}/${totalPages}`, ''];
+
+	if (events.length === 0) {
+		lines.push('Лог пуст.');
+	} else {
+		for (const [index, event] of events.entries()) {
+			lines.push(`${start + index + 1}. ${event}`);
+		}
+	}
+
+	return lines.join('\n');
+}
+
 export function renderBattleText(
 	state: BattleState,
 	player1: Player,
@@ -30,7 +64,8 @@ export function renderBattleText(
 		'',
 		renderParticipant(second, player2, cardLookup),
 		'',
-		`Событие: ${state.log[0] ?? 'Бой начался.'}`,
+		'Последние события:',
+		renderRecentEvents(state, 2),
 		state.status === 'finished' && winnerPlayer
 			? `Победитель: ${displayName(winnerPlayer)}`
 			: ''
